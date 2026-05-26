@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRUPO MOAS — Simulador de Frete</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1e4db7;--blue-l:#eef2fd;--blue-m:#c7d4f7;
+  --green:#1a7a4a;--green-l:#e8f7ee;
+  --red:#c0392b;--red-l:#fdecea;
+  --amber:#c47d10;--amber-l:#fef6e4;
+  --bg:#f7f8fc;--bg2:#ffffff;--bg3:#f0f2f8;
+  --text:#1a1f36;--t2:#4a5275;--t3:#8892b0;
+  --bdr:#e4e8f0;--bdr2:#cdd3e0;
+  --r:8px;--rl:12px;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh2:0 8px 30px rgba(0,0,0,.12);
+}
+body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+/* LAYOUT */
+.shell{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:240px;min-width:240px;background:var(--bg2);border-right:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;min-width:0}
+/* SIDEBAR HEADER */
+.sb-logo-area{padding:18px 16px 12px;border-bottom:1px solid var(--bdr)}
+.logo-wordmark{font-size:18px;font-weight:400;color:#3a3f3a;letter-spacing:-.3px;margin-bottom:5px}
+.logo-bold{font-weight:800;color:#1e221e}
+
+.sb-tagline{font-size:9px;color:var(--t3);margin-top:5px;letter-spacing:.05em}
+/* SIDEBAR NAV */
+.sb-sec{padding:14px 14px 4px;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em}
+.sb-nav{list-style:none;padding:0 8px}
+.sb-nav li{margin-bottom:2px}
+.sb-nav li a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r);font-size:12px;color:var(--t2);cursor:pointer;transition:all .12s;border:none;background:none;width:100%;text-align:left}
+.sb-nav li a:hover{background:var(--bg3);color:var(--text)}
+.sb-nav li a.active{background:var(--blue-l);color:var(--blue);font-weight:600}
+.sb-nav li a svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sb-badge{font-size:9px;padding:1px 6px;border-radius:10px;background:var(--blue);color:#fff;margin-left:auto}
+/* SIDEBAR TRANSPORTADORAS */
+.sb-transp-list{padding:0 8px 4px}
+.sb-t-item{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:var(--r);font-size:11px;color:var(--t2);cursor:pointer;transition:background .1s;margin-bottom:1px}
+.sb-t-item:hover{background:var(--bg3);color:var(--text)}
+.sb-t-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sb-t-cnt{font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg3);color:var(--t3);margin-left:auto}
+/* SIDEBAR ESTADOS */
+.sb-estados-list{flex:1;overflow-y:auto;padding:0 8px 12px}
+.sb-e-item{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:var(--r);font-size:11px;color:var(--t2);cursor:pointer;transition:background .1s;margin-bottom:1px}
+.sb-e-item:hover{background:var(--bg3);color:var(--text)}
+.sb-e-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--bdr2)}
+.sb-e-dot.on{background:var(--green)}
+.sb-e-cnt{font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg3);color:var(--t3);margin-left:auto}
+.sb-e-cnt.has{background:var(--green-l);color:var(--green)}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
+/* TOPBAR */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px}
+.tb-title{font-size:15px;font-weight:700;color:var(--text)}
+.tb-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.tb-actions{display:flex;gap:8px;flex-shrink:0}
+/* CONTENT */
+.content{padding:20px;flex:1}
+.pv{display:none}.pv.active{display:block}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .14s;text-decoration:none;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{background:#1840a0;border-color:#1840a0}
+.btn-outline{background:var(--bg2);color:var(--t2);border-color:var(--bdr2)}
+.btn-outline:hover{background:var(--bg3);color:var(--text);border-color:var(--bdr2)}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-green:hover{background:#155f38}
+.btn-red{background:var(--red-l);color:var(--red);border-color:#f5c6c2}
+.btn-red:hover{background:var(--red);color:#fff}
+.btn-amber{background:var(--amber-l);color:var(--amber);border-color:#f5dea8}
+.btn-amber:hover{background:var(--amber);color:#fff}
+.btn-sm{padding:5px 10px;font-size:11px}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--rl);box-shadow:var(--sh)}
+.card-head{padding:14px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.card-title{font-size:13px;font-weight:700;color:var(--text)}
+.card-body{padding:16px}
+.gap-b{margin-bottom:14px}
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+/* FORM */
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select,.field textarea{
+  background:var(--bg2);border:1.5px solid var(--bdr);border-radius:var(--r);
+  padding:7px 10px;font-size:12px;color:var(--text);width:100%;transition:border .12s
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(30,77,183,.1)}
+.field.conf-h input,.field.conf-h select{border-color:var(--green);background:#f4fdf7}
+.field.conf-h::after{content:'✓ alta confiança';font-size:9px;color:var(--green);font-weight:600}
+.field.conf-m input,.field.conf-m select{border-color:var(--amber);background:#fffdf4}
+.field.conf-m::after{content:'⚠ revisar';font-size:9px;color:var(--amber);font-weight:600}
+.field.conf-l input,.field.conf-l select{border-color:var(--red);background:#fff8f8}
+.field.conf-l::after{content:'✗ preencher';font-size:9px;color:var(--red);font-weight:600}
+.ssep{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;padding:12px 0 6px;border-bottom:1px solid var(--bdr);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.b-blue{background:var(--blue-l);color:var(--blue)}
+.b-green{background:var(--green-l);color:var(--green)}
+.b-amber{background:var(--amber-l);color:var(--amber)}
+.b-red{background:var(--red-l);color:var(--red)}
+.b-gray{background:var(--bg3);color:var(--t2)}
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border-radius:var(--rl);border:1px solid var(--bdr)}
+.tbl{width:100%;border-collapse:collapse;font-size:11px;background:var(--bg2)}
+.tbl th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--bdr);background:var(--bg3);white-space:nowrap}
+.tbl td{padding:7px 10px;border-bottom:1px solid var(--bdr);color:var(--t2);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--text);font-weight:500}
+.tbl .best{color:var(--green);font-weight:700}
+.tbl .worst{color:var(--red)}
+/* CMP TABLE */
+.cmp-tbl{border-collapse:collapse;width:100%;font-size:11px}
+.cmp-tbl th{background:var(--bg3);padding:7px 10px;border:1px solid var(--bdr);font-size:9px;font-weight:700;color:var(--t2);text-align:center;white-space:nowrap}
+.cmp-tbl th.dh{text-align:left;background:var(--blue-l);color:var(--blue)}
+.cmp-tbl td{padding:6px 10px;border:1px solid var(--bdr);text-align:right;font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cmp-tbl td.dtd{text-align:left;font-weight:600;color:var(--text);background:var(--bg2)}
+.cmp-tbl .cbest{background:#edfaf2;color:#0e5c30;font-weight:700}
+.cmp-tbl .cworst{background:#fef0ef;color:#8b1a1a}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(10,15,35,.35);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;backdrop-filter:blur(2px)}
+.modal{background:var(--bg2);border-radius:14px;box-shadow:var(--sh2);width:100%;max-width:900px;margin:auto}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);z-index:1;border-radius:14px 14px 0 0}
+.modal-title{font-size:14px;font-weight:700}
+.modal-close{background:none;border:none;cursor:pointer;padding:5px;border-radius:var(--r);color:var(--t3);transition:all .12s;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:var(--bg3);color:var(--text)}
+.modal-close svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.modal-body{padding:20px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--bdr);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:var(--bg2);border-radius:0 0 14px 14px}
+.hidden{display:none!important}
+/* UPLOAD ZONE */
+.dropzone{border:2px dashed var(--bdr2);border-radius:var(--rl);padding:40px 20px;text-align:center;cursor:pointer;transition:all .14s;background:var(--bg)}
+.dropzone:hover,.dropzone.drag{border-color:var(--blue);background:var(--blue-l)}
+.dropzone svg{width:40px;height:40px;stroke:var(--t3);fill:none;stroke-width:1.5;stroke-linecap:round;margin-bottom:12px}
+.dropzone:hover svg,.dropzone.drag svg{stroke:var(--blue)}
+.dropzone h3{font-size:14px;font-weight:600;color:var(--t2);margin-bottom:4px}
+.dropzone p{font-size:12px;color:var(--t3);line-height:1.6}
+/* AI PROGRESS */
+.ai-box{background:var(--blue-l);border:1px solid var(--blue-m);border-radius:var(--rl);padding:16px;margin-top:14px}
+.ai-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.spinner{width:16px;height:16px;border:2px solid rgba(30,77,183,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-steps{display:flex;flex-direction:column;gap:4px}
+.ai-step{font-size:11px;padding:2px 0;color:var(--blue)}
+.ai-step.done::before{content:"✓ ";color:var(--green);font-weight:700}
+.ai-step.active::before{content:"⟳ ";color:var(--blue);font-weight:700}
+.ai-step.wait{color:var(--t3)}
+/* PREVIEW FIELDS */
+.pf{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-radius:5px;margin-bottom:3px;border-left:3px solid}
+.pf-h{background:#f0fbf5;border-color:var(--green)}
+.pf-m{background:#fffbf0;border-color:var(--amber)}
+.pf-l{background:#fff5f5;border-color:var(--red)}
+.pf-k{font-size:10px;color:var(--t2)}
+.pf-v{font-size:11px;font-weight:700}
+.pf-h .pf-v{color:var(--green)}
+.pf-m .pf-v{color:var(--amber)}
+.pf-l .pf-v{color:var(--red)}
+/* ALERT */
+.alert{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;border-radius:var(--r);font-size:11px;line-height:1.5}
+.alert svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;margin-top:1px}
+.a-info{background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-m)}
+.a-warn{background:var(--amber-l);color:var(--amber);border:1px solid #f0d090}
+.a-ok{background:var(--green-l);color:var(--green);border:1px solid #a8dfc0}
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--bdr);margin-bottom:14px}
+.tab-btn{padding:8px 14px;font-size:12px;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .12s}
+.tab-btn:hover{color:var(--t2)}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-pane{display:none}.tab-pane.active{display:block}
+/* CHART */
+.chart-wrap{position:relative;height:260px;width:100%}
+.chart-leg{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:10px;color:var(--t2)}
+.leg-i{display:flex;align-items:center;gap:4px}
+.leg-d{width:14px;height:2px;border-radius:2px;flex-shrink:0}
+/* RESULT BANNER */
+.res-banner{display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:var(--rl);font-size:13px;font-weight:700;margin-bottom:16px}
+.rb-green{background:var(--green-l);color:var(--green);border:1px solid #b0e0c8}
+.rb-gray{background:var(--bg3);color:var(--t2);border:1px solid var(--bdr2)}
+.res-banner svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0}
+/* METRIC CARD */
+.mc-grid{display:grid;gap:10px;margin-bottom:16px}
+.mc{background:var(--bg2);border:1.5px solid var(--bdr);border-radius:var(--rl);padding:14px 16px}
+.mc.winner{border-color:var(--green);background:var(--green-l)}
+.mc-label{font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.mc-value{font-size:22px;font-weight:800;color:var(--text);line-height:1}
+.mc-diff{font-size:11px;margin-top:4px;font-weight:600}
+.cheaper{color:var(--green)}
+.pricier{color:var(--red)}
+/* BREAKDOWN */
+.bd-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:11px}
+.bd-row:last-child{border-bottom:none}
+.bd-k{color:var(--t2)}.bd-v{font-weight:600;color:var(--text)}
+.bd-total{border-top:2px solid var(--bdr2)!important;padding-top:8px!important;margin-top:4px}
+.bd-total .bd-k,.bd-total .bd-v{font-size:12px;font-weight:800}
+/* COMP BAR */
+.cbar{height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-top:4px}
+.cbar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+/* VERSION CARD */
+.ver-card{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+/* FAIXA CHIP */
+.fchip{display:flex;align-items:center;gap:3px;background:var(--bg2);border:1px solid var(--bdr);border-radius:6px;padding:3px 8px;font-size:11px}
+.fchip input{border:none;background:transparent;color:var(--text);padding:0;font-size:11px;text-align:center;width:46px}
+.fchip span{color:var(--t3);font-size:10px;white-space:nowrap}
+.fchip button{color:var(--red);background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px;line-height:1}
+@media print{.sidebar,.topbar{display:none!important}.shell{display:block}.main{overflow:visible}}
+</style>
+</head>
+<body>
+<div class="shell">
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-logo-area">
+    <div class="logo-wordmark">GRUPO<span class="logo-bold">MOAS</span></div>
+    <div class="sb-tagline">Simulador de Frete &middot; Origem SP</div>
+  </div>
+    <div class="sb-sec">Menu</div>
+  <ul class="sb-nav">
+    <li><a onclick="showPage('dashboard')" id="nav-dashboard" class="active">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard
+    </a></li>
+    <li><a onclick="showPage('transportadoras')" id="nav-transportadoras">
+      <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Transportadoras
+    </a></li>
+    <li><a onclick="showPage('importar')" id="nav-importar">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Importar Tabela ✨
+    </a></li>
+    <li><a onclick="showPage('simulador')" id="nav-simulador">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Simulador
+    </a></li>
+    <li><a onclick="showPage('historico')" id="nav-historico">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Histórico
+    </a></li>
+  </ul>
+
+  <div class="sb-sec">Transportadoras</div>
+  <div class="sb-transp-list" id="sb_transp"></div>
+
+  <div class="sb-sec">Destinos por Estado</div>
+  <div class="sb-estados-list" id="sb_estados"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="tb-title" id="tb_title">Dashboard</div>
+      <div class="tb-sub" id="tb_sub">Origem: São Paulo — SP</div>
+    </div>
+    <div class="tb-actions">
+      <button class="btn btn-outline btn-sm" onclick="exportarDados()">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Backup JSON
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('bk_inp').click()">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Restaurar
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="abrirConfigs()" id="cfg_btn" title="Configurar API Key">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>&#9881; API Key
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="showPage('importar')">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>+ Transportadora
+      </button>
+    </div>
+  </div>
+  <input type="file" id="bk_inp" accept=".json" class="hidden" onchange="restaurarBK(event)">
+  <input type="file" id="file_up" accept=".pdf,.xlsx,.xls,.txt,.csv,.jpg,.jpeg,.png" class="hidden" onchange="handleFile(this.files[0])">
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="pv active" id="pv-dashboard">
+      <div class="g4 gap-b" id="dash_kpis"></div>
+      <div class="g2 gap-b">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Transportadoras</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-sm" onclick="showPage('importar')">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Importar PDF
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="abrirModalT()">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Manual
+              </button>
+            </div>
+          </div>
+          <div class="card-body" id="dash_tlist"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Competitividade por destino</span>
+            <span class="badge b-gray" id="dash_peso_tag">50 kg</span>
+          </div>
+          <div class="card-body" id="dash_comp" style="max-height:340px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Comparativo geral — melhor preço por destino</span></div>
+        <div class="card-body"><div id="dash_cmp" style="overflow-x:auto"></div></div>
+      </div>
+    </div>
+
+    <!-- TRANSPORTADORAS -->
+    <div class="pv" id="pv-transportadoras">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px">
+        <button class="btn btn-outline" onclick="showPage('importar')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Importar PDF/Excel
+        </button>
+        <button class="btn btn-primary" onclick="abrirModalT()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nova transportadora
+        </button>
+      </div>
+      <div id="transp_grid" class="g2"></div>
+    </div>
+
+    <!-- IMPORTAR -->
+    <div class="pv" id="pv-importar">
+      <div class="card">
+        <div class="card-head"><span class="card-title">✨ Importar tabela com leitura por IA</span></div>
+        <div class="card-body">
+          <div class="alert a-info gap-b">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>A IA lê o arquivo, extrai faixas de peso, generalidades e taxas, e preenche tudo. Campos em <strong style="color:var(--amber)">laranja</strong> precisam de revisão, em <strong style="color:var(--red)">vermelho</strong> não foram encontrados. Se a transportadora já existir, uma nova versão é criada mantendo o histórico.</span>
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Selecione a IA para leitura</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div id="card_gemini" onclick="trocarProvider('gemini')" style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:var(--rl);border:2px solid var(--sage);background:var(--sage-l);cursor:pointer;transition:all .14s">
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:700;color:var(--sage-d)">Google Gemini</span><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--green-l);color:var(--green)">GRATUITO</span></div>
+            <div style="font-size:11px;color:var(--t2);line-height:1.5">Sem cart&atilde;o de cr&eacute;dito.<br>Chave via Gmail em 1 min.</div>
+            <div id="gemini_key_status" style="font-size:10px;margin-top:2px"></div>
+          </div>
+          <div id="card_claude" onclick="trocarProvider('claude')" style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:var(--rl);border:2px solid var(--bdr);background:var(--bg2);cursor:pointer;transition:all .14s">
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:700;color:var(--text)">Claude Anthropic</span><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--blue-l);color:var(--blue)">PAGO</span></div>
+            <div style="font-size:11px;color:var(--t2);line-height:1.5">US$5 cr&eacute;dito gratuito ao criar.<br>~500 importa&ccedil;&otilde;es por US$5.</div>
+            <div id="claude_key_status" style="font-size:10px;margin-top:2px"></div>
+          </div>
+        </div>
+        <div id="guide_gemini">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:var(--t2)">Como obter a chave Gemini:</span><button onclick="document.getElementById('steps_gemini').classList.toggle('hidden');this.textContent=this.textContent.includes('Ver')?'Ocultar':'Ver passo a passo'" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 9px">Ver passo a passo</button></div>
+          <div id="steps_gemini" class="hidden" style="font-size:11px;color:var(--t2);display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--sage);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span><span>Acesse <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--sage);font-weight:700">aistudio.google.com/app/apikey</a></span></div>
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--sage);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span><span>Login com <strong style="color:var(--text)">Gmail</strong></span></div>
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--sage);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span><span>Clique em <strong style="color:var(--text)">Create API key &rarr; Create API key in new project</strong></span></div>
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--sage);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</span><span>Copie a chave (<code style="background:var(--bg2);padding:0 4px;border-radius:3px">AIzaSy...</code>) e cole abaixo</span></div>
+          </div>
+        </div>
+        <div id="guide_claude" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:var(--t2)">Como obter a chave Claude:</span><button onclick="document.getElementById('steps_claude').classList.toggle('hidden');this.textContent=this.textContent.includes('Ver')?'Ocultar':'Ver passo a passo'" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 9px">Ver passo a passo</button></div>
+          <div id="steps_claude" class="hidden" style="font-size:11px;color:var(--t2);display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span><span>Acesse <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue);font-weight:700">console.anthropic.com</a> e crie conta</span></div>
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span><span><strong style="color:var(--text)">Settings &rarr; Billing</strong> &mdash; adicione US$5</span></div>
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span><span><strong style="color:var(--text)">API Keys &rarr; Create Key</strong> &mdash; copie</span></div>
+            <div style="display:flex;gap:7px"><span style="min-width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</span><span>Cole abaixo (<code style="background:var(--bg2);padding:0 4px;border-radius:3px">sk-ant-...</code>)</span></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+          <input type="password" id="inline_key_input" placeholder="Cole sua chave aqui..." style="flex:1;font-family:monospace;font-size:12px">
+          <button class="btn btn-primary btn-sm" onclick="salvarKeyInline()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2l11 0 5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Salvar</button>
+        </div>
+        <div id="inline_key_msg" style="font-size:10px;min-height:14px;margin-top:4px"></div>
+      </div>
+      <div class="dropzone" id="dropzone"
+               onclick="document.getElementById('file_up').click()"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="event.preventDefault();this.classList.remove('drag');handleFile(event.dataTransfer.files[0])">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>Arraste o arquivo aqui ou clique para selecionar</h3>
+            <p>PDF · Excel (.xlsx / .xls) · Imagem (.jpg / .png) · Texto (.txt / .csv)<br>Tabelas de frete fracionado — Origem São Paulo</p>
+          </div>
+          <div id="ai_prog" class="hidden"></div>
+          <div id="imp_prev" class="hidden" style="margin-top:16px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIMULADOR -->
+    <div class="pv" id="pv-simulador">
+      <div class="g2 gap-b">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Parâmetros da remessa</span></div>
+          <div class="card-body">
+            <div class="g3" style="margin-bottom:10px">
+              <div class="field"><label>Destino (UF)</label><select id="s_uf" onchange="updatePesoNote()"></select></div>
+              <div class="field"><label>Peso real (kg)</label><input type="number" id="s_peso" value="50" min="0.1" step="0.1" oninput="updatePesoNote()"></div>
+              <div class="field"><label>Volume (m³)</label><input type="number" id="s_vol" value="0" min="0" step="0.001" oninput="updatePesoNote()"></div>
+            </div>
+            <div class="g3" style="margin-bottom:10px">
+              <div class="field"><label>Valor da NF (R$)</label><input type="number" id="s_nf" value="1000" min="0"></div>
+              <div class="field"><label>Fator cubagem (kg/m³)</label><input type="number" id="s_cub" value="200" step="1" oninput="updatePesoNote()"></div>
+              <div class="field"><label>Paletes PBR</label><input type="number" id="s_pal" value="0" min="0"></div>
+            </div>
+            <div class="g3" style="margin-bottom:10px">
+              <div class="field"><label>TDE / Agendamento</label><select id="s_tde"><option value="0">Não</option><option value="1">Sim</option></select></div>
+              <div class="field"><label>Reentrega</label><select id="s_reent"><option value="0">Não</option><option value="50">Sim — 50%</option><option value="100">Sim — 100%</option></select></div>
+              <div class="field"><label>TEC combustível (%)</label><input type="number" id="s_tec" value="0" min="0" step="0.5"></div>
+            </div>
+            <div id="peso_note" style="font-size:10px;color:var(--amber);font-weight:600;padding:2px 0;min-height:16px"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Configurações</span></div>
+          <div class="card-body">
+            <div class="field" style="margin-bottom:12px">
+              <label>Limite máximo de frete</label>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+                <input type="range" id="s_lim_r" min="50" max="10000" step="50" value="500"
+                       style="flex:1;accent-color:var(--amber)"
+                       oninput="document.getElementById('s_lim_v').textContent=fmt(+this.value)">
+                <span id="s_lim_v" style="font-size:13px;font-weight:700;color:var(--amber);min-width:80px;text-align:right">R$ 500,00</span>
+              </div>
+            </div>
+            <div class="ssep">Transportadoras para comparar</div>
+            <div id="s_checks" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;border-radius:var(--rl);margin-bottom:16px" onclick="simular()">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Calcular e Comparar
+      </button>
+      <div id="sim_res" class="hidden"></div>
+    </div>
+
+    <!-- HISTORICO -->
+    <div class="pv" id="pv-historico">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="field" style="min-width:170px"><label>Filtrar destino</label><select id="hf_d" onchange="renderHist()"><option value="">Todos</option></select></div>
+          <div class="field" style="min-width:170px"><label>Filtrar transportadora</label><select id="hf_t" onchange="renderHist()"><option value="">Todas</option></select></div>
+        </div>
+        <button class="btn btn-red btn-sm" onclick="if(confirm('Limpar histórico?')){db.historico=[];salvarDB();renderHist()}">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>Limpar
+        </button>
+      </div>
+      <div id="hist_lista"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- MODAL TRANSPORTADORA -->
+<div class="modal-bg hidden" id="modal_t">
+<div class="modal">
+  <div class="modal-head">
+    <span class="modal-title" id="mt_title">Nova Transportadora</span>
+    <button class="modal-close" onclick="fecharModal('modal_t')">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body">
+    <div id="conf_leg" class="hidden">
+      <div class="alert a-info" style="margin-bottom:12px;font-size:10px">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span><span style="color:var(--green);font-weight:700">■ Verde</span> = encontrado · <span style="color:var(--amber);font-weight:700">■ Laranja</span> = revisar · <span style="color:var(--red);font-weight:700">■ Vermelho</span> = não encontrado</span>
+      </div>
+    </div>
+    <div class="ssep">Identificação</div>
+    <div class="g3" style="margin-bottom:10px">
+      <div class="field" id="cf_nome" style="grid-column:span 2"><label>Nome / Razão Social *</label><input type="text" id="t_nome" placeholder="Nome da transportadora"></div>
+      <div class="field" id="cf_cnpj"><label>CNPJ</label><input type="text" id="t_cnpj"></div>
+    </div>
+    <div class="g4" style="margin-bottom:10px">
+      <div class="field"><label>Contato</label><input type="text" id="t_contato"></div>
+      <div class="field"><label>Telefone</label><input type="text" id="t_telefone"></div>
+      <div class="field" id="cf_vig"><label>Vigência</label><input type="date" id="t_vigencia"></div>
+      <div class="field"><label>Seguradora</label><input type="text" id="t_seguradora"></div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>Observações</label><textarea id="t_obs" style="min-height:44px;resize:vertical"></textarea></div>
+
+    <div class="ssep">Destinos e faixas de peso
+      <button class="btn btn-outline btn-sm" onclick="addDest()">+ Destino</button>
+    </div>
+    <div id="dest_wrap"></div>
+
+    <div class="ssep">Generalidades e taxas</div>
+    <div class="g4" style="margin-bottom:8px">
+      <div class="field" id="cf_av"><label>Ad Valorem % NF</label><input type="number" id="t_av" value="0" step="0.01"></div>
+      <div class="field" id="cf_gris"><label>GRIS % NF</label><input type="number" id="t_gris" value="0.15" step="0.01"></div>
+      <div class="field" id="cf_gris_rj"><label>GRIS RJ especial %</label><input type="number" id="t_gris_rj" value="0.60" step="0.01"></div>
+      <div class="field" id="cf_ped"><label>Pedágio R$/100kg</label><input type="number" id="t_ped" value="4.78" step="0.01"></div>
+    </div>
+    <div class="g4" style="margin-bottom:8px">
+      <div class="field" id="cf_tas"><label>TAD/TAS por CT-e R$</label><input type="number" id="t_tas" value="4.29" step="0.01"></div>
+      <div class="field" id="cf_tde"><label>TDE/Agend. R$</label><input type="number" id="t_tde_v" value="250" step="0.01"></div>
+      <div class="field" id="cf_palet"><label>Paletização R$/palete</label><input type="number" id="t_palet" value="85.34" step="0.01"></div>
+      <div class="field" id="cf_tec"><label>TEC combustível %</label><input type="number" id="t_tec" value="0" step="0.01"></div>
+    </div>
+    <div class="g4" style="margin-bottom:8px">
+      <div class="field" id="cf_cub"><label>Cubagem kg/m³</label><input type="number" id="t_cub" value="200" step="1"></div>
+      <div class="field"><label>Reentrega % frete</label><input type="number" id="t_reent" value="50" step="1"></div>
+      <div class="field"><label>Devolução % frete</label><input type="number" id="t_dev" value="100" step="1"></div>
+      <div class="field"><label>Faturamento dias</label><input type="number" id="t_fat" value="20" step="1"></div>
+    </div>
+    <div class="g4">
+      <div class="field" id="cf_tda"><label>TDA dif. acesso R$</label><input type="number" id="t_tda" value="85.34" step="0.01"></div>
+      <div class="field"><label>Validade proposta dias</label><input type="number" id="t_val_p" value="60" step="1"></div>
+      <div class="field" id="cf_risco"><label>Área risco SP R$</label><input type="number" id="t_risco" value="0" step="0.01"></div>
+      <div class="field"><label>TRT trânsito % frete</label><input type="number" id="t_trt" value="0" step="0.01"></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="fecharModal('modal_t')">Cancelar</button>
+    <button class="btn btn-primary" onclick="salvarT()">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2l11 0 5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Salvar transportadora
+    </button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL ESTADO -->
+<div class="modal-bg hidden" id="modal_e">
+<div class="modal" style="max-width:720px">
+  <div class="modal-head">
+    <span class="modal-title" id="me_title">Comparativo</span>
+    <button class="modal-close" onclick="fecharModal('modal_e')">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body" id="me_body"></div>
+</div>
+</div>
+
+<!-- MODAL VERSÕES -->
+<div class="modal-bg hidden" id="modal_v">
+<div class="modal" style="max-width:680px">
+  <div class="modal-head">
+    <span class="modal-title" id="mv_title">Histórico de versões</span>
+    <button class="modal-close" onclick="fecharModal('modal_v')">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body" id="mv_body"></div>
+</div>
+</div>
+
+<script>
+// PDF.js config
+if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}
+
+// ── ESTADOS ──
+const ESTADOS=[
+  {uf:'AC',n:'Acre'},{uf:'AL',n:'Alagoas'},{uf:'AP',n:'Amapá'},{uf:'AM',n:'Amazonas'},
+  {uf:'BA',n:'Bahia'},{uf:'CE',n:'Ceará'},{uf:'DF',n:'Distrito Federal'},{uf:'ES',n:'Espírito Santo'},
+  {uf:'GO',n:'Goiás'},{uf:'MA',n:'Maranhão'},{uf:'MT',n:'Mato Grosso'},{uf:'MS',n:'Mato Grosso do Sul'},
+  {uf:'MG',n:'Minas Gerais'},{uf:'PA',n:'Pará'},{uf:'PB',n:'Paraíba'},{uf:'PR',n:'Paraná'},
+  {uf:'PE',n:'Pernambuco'},{uf:'PI',n:'Piauí'},{uf:'RJ',n:'Rio de Janeiro'},{uf:'RN',n:'Rio Grande do Norte'},
+  {uf:'RS',n:'Rio Grande do Sul'},{uf:'RO',n:'Rondônia'},{uf:'RR',n:'Roraima'},{uf:'SC',n:'Santa Catarina'},
+  {uf:'SP',n:'São Paulo'},{uf:'SE',n:'Sergipe'},{uf:'TO',n:'Tocantins'}
+];
+
+// ── DB ──
+let db={transportadoras:[],historico:[]};
+let editId=null, destTemp=[], chartInst=null;
+const COLORS=['#1e4db7','#1a7a4a','#c47d10','#c0392b','#6040b0','#0088a8','#555'];
+
+function salvarDB(){try{localStorage.setItem('gmv4',JSON.stringify(db));}catch(e){}}
+function carregarDB(){
+  try{const s=localStorage.getItem('gmv4');if(s)db=JSON.parse(s);}catch(e){}
+  if(!db.transportadoras)db.transportadoras=[];
+  if(!db.historico)db.historico=[];
+}
+function exportarDados(){
+  const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='gmoas_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+function restaurarBK(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{try{db=JSON.parse(ev.target.result);salvarDB();renderAll();alert('Backup restaurado com sucesso!');}catch(err){alert('Erro: '+err.message);}};
+  r.readAsText(f);e.target.value='';
+}
+
+// ── UTILS ──
+function fmt(v){return'R$ '+parseFloat(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+function fmtPct(v){return parseFloat(v||0).toFixed(2).replace('.',',')+'%';}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function fecharModal(id){document.getElementById(id).classList.add('hidden');}
+function getPeso(){
+  const pr=parseFloat(document.getElementById('s_peso').value)||0;
+  const vol=parseFloat(document.getElementById('s_vol').value)||0;
+  const f=parseFloat(document.getElementById('s_cub').value)||200;
+  return Math.max(pr,vol*f);
+}
+function updatePesoNote(){
+  const pr=parseFloat(document.getElementById('s_peso').value)||0;
+  const vol=parseFloat(document.getElementById('s_vol').value)||0;
+  const f=parseFloat(document.getElementById('s_cub').value)||200;
+  const pc=vol*f; const final=Math.max(pr,pc);
+  const el=document.getElementById('peso_note');
+  if(pc>pr){el.textContent='⚠ Cubagem: '+pc.toFixed(2)+'kg > peso real '+pr.toFixed(2)+'kg → cobrança: '+final.toFixed(2)+'kg';el.style.color='var(--amber)';}
+  else{el.textContent='Peso de cobrança: '+final.toFixed(2)+' kg';el.style.color='var(--t3)';}
+}
+
+// ── EXTRAÇÃO DE ARQUIVO ──
+async function extractText(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='pdf') return await extractPDF(file);
+  if(ext==='xlsx'||ext==='xls') return await extractExcel(file);
+  if(ext==='jpg'||ext==='jpeg'||ext==='png') return await extractImg(file);
+  return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsText(file,'UTF-8');});
+}
+async function extractPDF(file){
+  const ab=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  let text='';
+  for(let i=1;i<=Math.min(pdf.numPages,10);i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    const lines={};
+    content.items.forEach(item=>{const y=Math.round(item.transform[5]);if(!lines[y])lines[y]=[];lines[y].push({x:item.transform[4],txt:item.str});});
+    Object.keys(lines).sort((a,b)=>b-a).forEach(y=>{text+=lines[y].sort((a,b)=>a.x-b.x).map(i=>i.txt).join('\t')+'\n';});
+    text+='\n';
+  }
+  return text;
+}
+async function extractExcel(file){
+  const ab=await file.arrayBuffer();
+  const wb=XLSX.read(ab,{type:'array'});
+  let t='';
+  wb.SheetNames.forEach(n=>{t+='=== '+n+' ===\n'+XLSX.utils.sheet_to_csv(wb.Sheets[n],{blankrows:false})+'\n\n';});
+  return t;
+}
+async function extractImg(file){
+  return new Promise(res=>{
+    const r=new FileReader();
+    r.onload=e=>res({isImg:true,b64:e.target.result.split(',')[1],mime:file.type});
+    r.readAsDataURL(file);
+  });
+}
+
+// ── IA — Gemini (grátis) ou Claude (pago) ──
+function getProvider(){return localStorage.getItem('gmoas_provider')||'gemini';}
+function saveProvider(p){localStorage.setItem('gmoas_provider',p);}
+function getApiKey(){return localStorage.getItem('gmoas_apikey_'+getProvider())||'';}
+function getApiKeyFor(prov){return localStorage.getItem('gmoas_apikey_'+prov)||'';}
+
+async function lerComIA(conteudo){
+  const provider=getProvider();const apiKey=getApiKey();
+  if(!apiKey){throw new Error('API_KEY_MISSING');}
+  if(provider==='gemini') return await lerGemini(conteudo,apiKey);
+  return await lerClaude(conteudo,apiKey);
+}
+function getPrompt(){return `Voc\u00ea \u00e9 especialista em tabelas de frete brasileiro. Origem sempre SP/Guarulhos. Retorne SOMENTE JSON v\u00e1lido sem markdown.\n\nJSON:\n{"nome":"transportadora","cnpj":"cnpj ou null","vigencia":"YYYY-MM-DD ou null","seguradora":null,"obs":"resumo","av":0,"gris":0.15,"gris_rj":0.60,"ped":4.78,"tas":4.29,"tde_v":250,"palet":85.34,"tec":0,"cub":200,"reent":50,"dev":100,"fat":20,"val_p":60,"tda":85.34,"risco":0,"trt":0,"destinos":[{"key":"RJ_CAP","label":"RJ Capital","faixas":[{"ate":10,"valor":35.87},{"ate":30,"valor":46.35},{"ate":50,"valor":54.75},{"ate":70,"valor":62.36},{"ate":100,"valor":67.10},{"ate":150,"valor":84.45},{"ate":200,"valor":113.09}],"excedente":0.5654,"taxa_emb":0}],"confianca":{"nome":"high","cnpj":"high","vigencia":"medium","gris":"high","ped":"high","tas":"high","palet":"high","destinos":"high"}}\n\nREGRAS:\n- key: UF_CAP ou UF_INT\n- faixas: ate=kg_limite, valor=frete_reais\n- excedente=R$/kg acima ultima faixa\n- Percentuais: 0,15% => 0.15 | Valores: R$4,78 => 4.78\n- confianca: high/medium/low\n- Extraia TODOS os destinos SP/Guarulhos`;}
+function parseIAResponse(raw){const clean=raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();return JSON.parse(clean);}
+
+async function lerGemini(conteudo,apiKey){
+  let parts;
+  if(conteudo&&conteudo.isImg){parts=[{inlineData:{mimeType:conteudo.mime,data:conteudo.b64}},{text:getPrompt()+'\nAnalise a tabela na imagem.'}];}
+  else{parts=[{text:getPrompt()+'\n\nTEXTO:\n```\n'+String(conteudo).slice(0,14000)+'\n```'}];}
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0.1,maxOutputTokens:5000}})});
+  if(!resp.ok){let msg='';try{const e=await resp.json();msg=e.error?.message||'';}catch(e){}if(resp.status===400||resp.status===403||msg.toLowerCase().includes('api key'))throw new Error('API_KEY_INVALID');throw new Error('Gemini HTTP '+resp.status+(msg?' \u2014 '+msg.slice(0,100):''));}
+  const data=await resp.json();if(!data.candidates?.[0])throw new Error('Resposta vazia do Gemini');
+  return parseIAResponse(data.candidates[0].content.parts[0].text||'');
+}
+
+async function lerClaude(conteudo,apiKey){
+  let messages;
+  if(conteudo&&conteudo.isImg){messages=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:conteudo.mime,data:conteudo.b64}},{type:'text',text:getPrompt()+'\nAnalise a tabela na imagem.'}]}];}
+  else{messages=[{role:'user',content:getPrompt()+'\n\nTEXTO:\n```\n'+String(conteudo).slice(0,14000)+'\n```'}];}
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:5000,messages})});
+  if(!resp.ok){let msg='';try{const e=await resp.json();msg=e.error?.message||'';}catch(e){}if(resp.status===401)throw new Error('API_KEY_INVALID');throw new Error('Claude HTTP '+resp.status+(msg?' \u2014 '+msg.slice(0,100):''));}
+  const data=await resp.json();return parseIAResponse(data.content.filter(b=>b.type==='text').map(b=>b.text).join(''));
+}
+
+// ── HANDLE FILE ──
+async function handleFile(file){
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['pdf','xlsx','xls','txt','csv','docx','jpg','jpeg','png'].includes(ext)){
+    alert('Formato não suportado. Use PDF, Excel, imagem ou texto.');return;
+  }
+  const progEl=document.getElementById('ai_prog');
+  const prevEl=document.getElementById('imp_prev');
+  prevEl.classList.add('hidden');
+  progEl.classList.remove('hidden');
+  const steps=['Lendo arquivo…','Extraindo conteúdo…','IA analisando tabela…','Mapeando faixas e generalidades…','Calculando confiança dos campos…'];
+  progEl.innerHTML='<div class="ai-box"><div class="ai-head"><div class="spinner"></div><strong style="color:var(--blue);font-size:12px">Processando com IA…</strong></div><div class="ai-steps">'+steps.map((t,i)=>'<div class="ai-step '+(i===0?'active':'wait')+'" id="step'+i+'">'+t+'</div>').join('')+'</div></div>';
+  function setStep(i,state,msg){const el=document.getElementById('step'+i);if(el){el.className='ai-step '+state;el.textContent=msg;}}
+  function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+  try{
+    setStep(0,'active','Lendo: '+file.name+' ('+Math.round(file.size/1024)+'KB)…');
+    await sleep(200);
+    const conteudo=await extractText(file);
+    setStep(0,'done','✓ Arquivo lido');
+    setStep(1,'active','Extraindo conteúdo…');await sleep(150);
+    const linhas=conteudo&&conteudo.isImg?'imagem':String(conteudo).split('\n').filter(l=>l.trim()).length+' linhas';
+    setStep(1,'done','✓ '+linhas+' extraídos');
+    setStep(2,'active','IA analisando…');
+    const dados=await lerComIA(conteudo);
+    setStep(2,'done','✓ IA concluiu a análise');
+    setStep(3,'active','Mapeando destinos…');await sleep(150);
+    const nd=(dados.destinos||[]).length;
+    const nf=(dados.destinos||[]).reduce((a,d)=>a+(d.faixas||[]).length,0);
+    setStep(3,'done','✓ '+nd+' destino(s), '+nf+' faixa(s)');
+    setStep(4,'active','Calculando confiança…');await sleep(100);
+    const conf=dados.confianca||{};
+    const hi=Object.values(conf).filter(v=>v==='high').length;
+    const lo=Object.values(conf).filter(v=>v==='low').length;
+    setStep(4,'done','✓ Alta: '+hi+' · Baixa: '+lo);
+    const existente=db.transportadoras.find(t=>dados.nome&&t.nome&&t.nome.toLowerCase().includes(dados.nome.toLowerCase().split(' ')[0]));
+    const msgFinal=existente?'⚠ "'+existente.nome+'" já existe — será criada nova versão mantendo histórico.':'✅ Leitura concluída! Revise os campos abaixo.';
+    const colorFinal=existente?'var(--amber)':'var(--green)';
+    progEl.querySelector('.ai-box').innerHTML+=('<div style="margin-top:10px;font-size:12px;font-weight:700;color:'+colorFinal+'">'+msgFinal+'</div>');
+    window._impDados=dados;window._impExist=existente||null;
+    renderPreview(dados);
+  } catch(err){
+    const prov=getProvider();
+    let errHtml='';
+    if(err.message==='API_KEY_MISSING'){
+      errHtml='<div style="margin-top:12px;padding:12px 14px;background:var(--amber-l);border:1px solid #f0d090;border-radius:var(--r);font-size:12px;color:var(--amber)"><strong>\u26a0 Chave n\u00e3o configurada</strong><br>Cole sua chave no campo acima e clique em <strong>Salvar</strong>.</div>';
+    } else if(err.message==='API_KEY_INVALID'){
+      errHtml='<div style="margin-top:12px;padding:10px 14px;background:var(--red-l);border:1px solid #f0c0c0;border-radius:var(--r);font-size:11px;color:var(--red)"><strong>\u274c Chave inv\u00e1lida do '+(prov==='gemini'?'Gemini':'Claude')+'.</strong> Cole a chave correta acima e tente novamente.</div>';
+    } else if(err.message.includes('fetch')||err.message.includes('Failed')||err.message.includes('NetworkError')||err.message.includes('CORS')){
+      errHtml='<div style="margin-top:12px;padding:12px 14px;background:var(--red-l);border:1px solid #f0c0c0;border-radius:var(--r);font-size:12px;color:var(--red)"><strong>\u274c Erro de conex\u00e3o com a IA</strong><br><br>Este arquivo precisa ser aberto via servidor local (n\u00e3o direto do computador).<br><br><strong>Solu\u00e7\u00e3o r\u00e1pida:</strong><ol style="margin:8px 0 0 16px;line-height:2"><li>Abra o <strong>Terminal</strong> (Windows: cmd ou PowerShell)</li><li>Digite: <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">cd "PASTA ONDE SALVOU O ARQUIVO"</code></li><li>Digite: <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">python -m http.server 8080</code></li><li>Abra no Chrome: <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">http://localhost:8080/gmoas_final.html</code></li></ol></div>';
+    } else {
+      errHtml='<div style="margin-top:12px;padding:10px 14px;background:var(--red-l);border:1px solid #f0c0c0;border-radius:var(--r);font-size:11px;color:var(--red)"><strong>Erro:</strong> '+err.message+'</div>';
+    }
+    errHtml+='<div style="margin-top:8px"><button class="btn btn-outline btn-sm" onclick="abrirModalT()">Cadastrar manualmente</button></div>';
+    progEl.querySelector('.ai-box').innerHTML+=errHtml;
+    console.error('IA Error:',err);
+  }
+}
+
+function renderPreview(d){
+  const el=document.getElementById('imp_prev');
+  const conf=d.confianca||{};
+  const vals=Object.values(conf);
+  const score=vals.length?Math.round((vals.filter(v=>v==='high').length*2+vals.filter(v=>v==='medium').length)/(vals.length*2)*100):70;
+  const sc=score>=70?'var(--green)':score>=40?'var(--amber)':'var(--red)';
+  const pf=(lbl,val,c)=>{
+    const cl=c==='high'?'pf-h':c==='medium'?'pf-m':'pf-l';
+    const ic=c==='high'?'✓':c==='medium'?'⚠':'✗';
+    return '<div class="pf '+cl+'"><span class="pf-k">'+lbl+'</span><span class="pf-v">'+ic+' '+(val||'—')+'</span></div>';
+  };
+  const cb=c=>c==='high'?'<span class="badge b-green">Alta</span>':c==='medium'?'<span class="badge b-amber">Média</span>':'<span class="badge b-red">Baixa</span>';
+  const existMsg=window._impExist?'<div class="alert a-warn" style="margin-bottom:10px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>"'+window._impExist.nome+'" já cadastrada. Será criada nova versão mantendo histórico.</span></div>':'';
+  el.innerHTML='<div class="card"><div class="card-head"><span class="card-title">Prévia — '+(d.nome||'Transportadora')+'</span><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:'+sc+'">Confiança: '+score+'%</span><button class="btn btn-green btn-sm" onclick="confirmarImport()"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Confirmar e salvar</button><button class="btn btn-outline btn-sm" onclick="abrirModalComDados()"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Revisar campos</button></div></div><div class="card-body">'+existMsg+'<div class="g2" style="margin-bottom:14px"><div><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Dados gerais</div>'+pf('Nome',d.nome,conf.nome||'high')+pf('CNPJ',d.cnpj,conf.cnpj||'medium')+pf('Vigência',d.vigencia,conf.vigencia||'medium')+pf('Seguradora',d.seguradora,'medium')+'</div><div><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Generalidades</div>'+pf('GRIS',d.gris+'%',conf.gris||'high')+pf('GRIS RJ',d.gris_rj+'%',conf.gris_rj||'medium')+pf('Pedágio',fmt(d.ped)+'/100kg',conf.ped||'high')+pf('TAD/TAS',fmt(d.tas)+'/CT-e',conf.tas||'high')+pf('TDE/Agend.',fmt(d.tde_v),conf.tde_v||'medium')+pf('Paletização',fmt(d.palet),conf.palet||'high')+'</div></div><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Destinos ('+((d.destinos||[]).length)+')</div>'+(d.destinos&&d.destinos.length?'<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Destino</th><th>até 10</th><th>até 30</th><th>até 50</th><th>até 70</th><th>até 100</th><th>até 150</th><th>até 200</th><th>Excedente</th><th>Conf.</th></tr></thead><tbody>'+d.destinos.map(dest=>{const ff=ate=>{const fx=(dest.faixas||[]).find(f=>f.ate==ate);return fx?'R$'+fx.valor.toFixed(2).replace('.',','):'—';};return'<tr><td style="font-weight:600">'+( dest.label||dest.key)+'</td><td class="num">'+ff(10)+'</td><td class="num">'+ff(30)+'</td><td class="num">'+ff(50)+'</td><td class="num">'+ff(70)+'</td><td class="num">'+ff(100)+'</td><td class="num">'+ff(150)+'</td><td class="num">'+ff(200)+'</td><td class="num">'+(dest.excedente?(dest.excedente.toFixed(4)+'/kg'):'—')+'</td><td>'+cb(conf.destinos||'medium')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="alert a-warn"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Nenhum destino identificado. Adicione após salvar.</span></div>')+'</div></div>';
+  el.classList.remove('hidden');
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function confirmarImport(){
+  const d=window._impDados;if(!d)return;
+  const existente=window._impExist;
+  const t=buildTransp(d);
+  if(existente){
+    const idx=db.transportadoras.findIndex(x=>x.id===existente.id);
+    if(idx>=0){
+      if(!db.transportadoras[idx].versoes)db.transportadoras[idx].versoes=[];
+      db.transportadoras[idx].versoes.push({...db.transportadoras[idx],versoes:undefined,ts_v:Date.now()});
+      t.id=existente.id;t.versoes=db.transportadoras[idx].versoes;
+      db.transportadoras[idx]=t;
+    }
+  } else {db.transportadoras.push(t);}
+  salvarDB();renderAll();
+  document.getElementById('imp_prev').classList.add('hidden');
+  document.getElementById('ai_prog').classList.add('hidden');
+  document.getElementById('file_up').value='';
+  showPage('transportadoras');
+  alert('✓ '+(existente?'Nova versão de ':'Transportadora ')+(t.nome)+' salva!');
+}
+function abrirModalComDados(){abrirModalT(null,window._impDados);}
+function buildTransp(d){
+  return{id:uid(),nome:d.nome||'Transportadora',cnpj:d.cnpj||'',vigencia:d.vigencia||'',seguradora:d.seguradora||'',obs:d.obs||'',
+    av:+d.av||0,gris:+d.gris||0.15,gris_rj:+d.gris_rj||0.60,ped:+d.ped||4.78,tas:+d.tas||4.29,
+    tde:+d.tde_v||250,palet:+d.palet||85.34,tec:+d.tec||0,cub:+d.cub||200,reent:+d.reent||50,
+    dev:+d.dev||100,fat:+d.fat||20,val_p:+d.val_p||60,tda:+d.tda||85.34,risco:+d.risco||0,trt:+d.trt||0,
+    ts:Date.now(),
+    destinos:(d.destinos||[]).map(dest=>({key:dest.key,label:dest.label||dest.key,
+      faixas:(dest.faixas||[]).map(f=>({ate:+f.ate,valor:+f.valor})),
+      excedente:+dest.excedente||0,taxa_emb:+dest.taxa_emb||0}))};
+}
+
+// ── MODAL TRANSPORTADORA ──
+function abrirModalT(id,impData){
+  editId=id||null;destTemp=[];
+  const t=id?db.transportadoras.find(x=>x.id===id):null;
+  const d=impData||t||null;
+  const conf=impData?(impData.confianca||{}):null;
+  document.getElementById('mt_title').textContent=t?('Editar: '+t.nome):impData?('Revisar: '+impData.nome):'Nova Transportadora';
+  document.getElementById('conf_leg').classList.toggle('hidden',!conf);
+  const im={nome:'t_nome',cnpj:'t_cnpj',seguradora:'t_seguradora',obs:'t_obs',
+    av:'t_av',gris:'t_gris',gris_rj:'t_gris_rj',ped:'t_ped',tas:'t_tas',
+    tde_v:'t_tde_v',palet:'t_palet',tec:'t_tec',cub:'t_cub',reent:'t_reent',
+    dev:'t_dev',fat:'t_fat',val_p:'t_val_p',tda:'t_tda',risco:'t_risco',trt:'t_trt'};
+  const cm={nome:'cf_nome',cnpj:'cf_cnpj',vigencia:'cf_vig',gris:'cf_gris',gris_rj:'cf_gris_rj',
+    ped:'cf_ped',tas:'cf_tas',tde_v:'cf_tde',palet:'cf_palet',tec:'cf_tec',
+    cub:'cf_cub',tda:'cf_tda',risco:'cf_risco'};
+  Object.entries(im).forEach(([k,iid])=>{
+    const el=document.getElementById(iid);if(!el)return;
+    let v='';
+    if(d){const dk=(k==='tde_v'&&t)?'tde':k; v=d[dk]!==undefined&&d[dk]!==null?d[dk]:'';}
+    el.value=v;
+  });
+  document.getElementById('t_vigencia').value=d?d.vigencia||'':'';
+  if(conf){
+    Object.entries(cm).forEach(([k,wid])=>{
+      const el=document.getElementById(wid);if(!el)return;
+      el.classList.remove('conf-h','conf-m','conf-l');
+      const c=conf[k]||'high';
+      if(c==='high')el.classList.add('conf-h');
+      else if(c==='medium')el.classList.add('conf-m');
+      else el.classList.add('conf-l');
+    });
+  } else {
+    document.querySelectorAll('[id^="cf_"]').forEach(el=>el.classList.remove('conf-h','conf-m','conf-l'));
+  }
+  const src=impData?impData.destinos:t?t.destinos:null;
+  if(src)destTemp=src.map(dest=>({...dest,faixas:(dest.faixas||[]).map(f=>({...f}))}));
+  renderDestinos();
+  document.getElementById('modal_t').classList.remove('hidden');
+}
+
+function salvarT(){
+  const nome=document.getElementById('t_nome').value.trim();
+  if(!nome){alert('Informe o nome da transportadora.');return;}
+  const g=f=>{const el=document.getElementById('t_'+f);return el?parseFloat(el.value)||0:0;};
+  const gs=f=>{const el=document.getElementById('t_'+f);return el?el.value:'';};
+  const existing=editId?db.transportadoras.find(x=>x.id===editId):null;
+  const t={id:editId||uid(),nome,cnpj:gs('cnpj'),vigencia:document.getElementById('t_vigencia').value,
+    seguradora:gs('seguradora'),obs:gs('obs'),
+    av:g('av'),gris:g('gris'),gris_rj:g('gris_rj'),ped:g('ped'),tas:g('tas'),
+    tde:g('tde_v'),palet:g('palet'),tec:g('tec'),cub:g('cub'),reent:g('reent'),
+    dev:g('dev'),fat:g('fat'),val_p:g('val_p'),tda:g('tda'),risco:g('risco'),trt:g('trt'),
+    ts:Date.now(),versoes:existing?existing.versoes||[]:undefined,destinos:destTemp};
+  if(editId){
+    const idx=db.transportadoras.findIndex(x=>x.id===editId);
+    if(idx>=0){
+      if(!t.versoes)t.versoes=[];
+      t.versoes.push({...db.transportadoras[idx],versoes:undefined,ts_v:Date.now()});
+      db.transportadoras[idx]=t;
+    }
+  } else {db.transportadoras.push(t);}
+  salvarDB();fecharModal('modal_t');renderAll();
+}
+
+// ── DESTINOS ──
+function addDest(){
+  destTemp.push({key:'SP_CAP',label:'SP Capital',
+    faixas:[{ate:10,valor:0},{ate:30,valor:0},{ate:50,valor:0},{ate:70,valor:0},{ate:100,valor:0},{ate:150,valor:0},{ate:200,valor:0}],
+    excedente:0,taxa_emb:0});
+  renderDestinos();
+}
+function remDest(i){destTemp.splice(i,1);renderDestinos();}
+function addFaixa(di){destTemp[di].faixas.push({ate:0,valor:0});renderDestinos();}
+function remFaixa(di,fi){destTemp[di].faixas.splice(fi,1);renderDestinos();}
+function updKey(di,val,part){
+  const d=destTemp[di];const[cu,ct]=(d.key||'SP_CAP').split('_');
+  d.key=(part==='uf'?val:cu)+'_'+(part==='tipo'?val:(ct||'CAP'));
+}
+function renderDestinos(){
+  const c=document.getElementById('dest_wrap');
+  if(!destTemp.length){c.innerHTML='<p style="font-size:11px;color:var(--t3);margin:6px 0">Nenhum destino. Clique em "+ Destino".</p>';return;}
+  c.innerHTML=destTemp.map((d,di)=>'<div style="background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rl);padding:12px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><div class="field" style="flex:1;min-width:80px"><label>UF</label><select onchange="updKey('+di+',this.value,\'uf\')">'+(ESTADOS.map(e=>'<option value="'+e.uf+'" '+(d.key.startsWith(e.uf)?'selected':'')+'>'+e.uf+'</option>').join(''))+'</select></div><div class="field" style="flex:1;min-width:80px"><label>Tipo</label><select onchange="updKey('+di+',this.value,\'tipo\')"><option value="CAP" '+(d.key.endsWith('CAP')?'selected':'')+'>Capital</option><option value="INT" '+(d.key.endsWith('INT')?'selected':'')+'>Interior</option></select></div><div class="field" style="flex:2;min-width:120px"><label>Label</label><input type="text" value="'+( d.label||'')+'" oninput="destTemp['+di+'].label=this.value"></div><div class="field" style="min-width:110px"><label>Taxa emb. R$/kg</label><input type="number" value="'+(d.taxa_emb||0)+'" step="0.0001" oninput="destTemp['+di+'].taxa_emb=+this.value"></div><button class="btn btn-red btn-sm" onclick="remDest('+di+')" style="margin-top:14px">✕ Remover</button></div><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">Faixas de peso<button class="btn btn-outline btn-sm" onclick="addFaixa('+di+')" style="font-size:9px;padding:2px 8px">+ Faixa</button></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+(d.faixas.map((fx,fi)=>'<div class="fchip"><span>até</span><input type="number" value="'+fx.ate+'" oninput="destTemp['+di+'].faixas['+fi+'].ate=+this.value" title="Limite kg"><span>kg →</span><input type="number" value="'+fx.valor+'" oninput="destTemp['+di+'].faixas['+fi+'].valor=+this.value" title="R$" style="width:58px"><button onclick="remFaixa('+di+','+fi+')">✕</button></div>').join(''))+'</div><div class="field" style="max-width:210px"><label>Excedente R$/kg (acima da última faixa)</label><input type="number" value="'+(d.excedente||0)+'" step="0.0001" oninput="destTemp['+di+'].excedente=+this.value"></div></div>').join('');
+}
+</script>
+
+<script>
+// ── CÁLCULO ──
+function getFreteBase(t,key,peso){
+  const dest=t.destinos.find(d=>d.key===key);if(!dest)return null;
+  const sorted=[...dest.faixas].sort((a,b)=>a.ate-b.ate);
+  for(const fx of sorted){if(peso<=fx.ate)return{val:fx.valor,dest};}
+  const exc=dest.excedente||0;
+  return exc>0?{val:exc*peso,dest}:null;
+}
+function calcFrete(t,key,peso,p){
+  const res=getFreteBase(t,key,peso);if(!res)return null;
+  const{val:fb,dest}=res;
+  const uf=key.split('_')[0];
+  const grisRate=uf==='RJ'?(t.gris_rj||0.60):(t.gris||0.15);
+  const av=p.nf*(t.av||0)/100;
+  const gris=p.nf*grisRate/100;
+  const ped=Math.ceil(peso/100)*(t.ped||0);
+  const tas=t.tas||0;
+  const emb=(dest.taxa_emb||0)*peso;
+  const tdeV=p.tde?(t.tde||250):0;
+  const palV=(p.paletes||0)*(p.palcusto||85.34);
+  const riscoV=(p.risco&&uf==='SP')?(t.risco||0):0;
+  const reentV=p.reentPct>0?fb*p.reentPct/100:0;
+  let sub=fb+av+gris+ped+tas+emb+tdeV+palV+riscoV+reentV;
+  const tecV=p.tec>0?sub*p.tec/100:0;
+  return{total:sub+tecV,fbase:fb,av,gris,grisRate,ped,tas,emb,tdeV,palV,riscoV,reentV,tecV};
+}
+
+// ── NAVEGAÇÃO ──
+const PT={
+  dashboard:['Dashboard','Visão geral · Origem São Paulo — SP'],
+  transportadoras:['Transportadoras','Cadastro, versões e gestão'],
+  importar:['Importar Tabela ✨','Leitura inteligente com IA'],
+  simulador:['Simulador de Frete','Comparativo entre transportadoras'],
+  historico:['Histórico de Simulações','Consultas realizadas']
+};
+function showPage(p){
+  document.querySelectorAll('.pv').forEach(el=>el.classList.remove('active'));
+  document.getElementById('pv-'+p).classList.add('active');
+  document.querySelectorAll('.sb-nav li a').forEach(el=>el.classList.remove('active'));
+  const nav=document.getElementById('nav-'+p);if(nav)nav.classList.add('active');
+  document.getElementById('tb_title').textContent=PT[p][0];
+  document.getElementById('tb_sub').textContent=PT[p][1];
+  if(p==='dashboard')renderDashboard();
+  if(p==='historico')renderHist();
+  if(p==='simulador'){renderSimChecks();populateUFs();} if(p==='importar'){setTimeout(atualizarStatusApiKey,50);checkProtocol();}
+  if(p==='transportadoras')renderTransportadoras();
+}
+
+// ── SIDEBAR ──
+function renderSidebar(){
+  // Transportadoras
+  const st=document.getElementById('sb_transp');
+  if(!db.transportadoras.length){
+    st.innerHTML='<p style="font-size:10px;color:var(--t3);padding:4px 10px">Nenhuma cadastrada</p>';
+  } else {
+    st.innerHTML=db.transportadoras.map((t,i)=>'<div class="sb-t-item" onclick="showPage(\'simulador\')"><span class="sb-t-dot" style="background:'+COLORS[i%COLORS.length]+'"></span><span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+t.nome.split(' ').slice(0,2).join(' ')+'</span><span class="sb-t-cnt">'+t.destinos.length+'d</span></div>').join('');
+  }
+  // Estados
+  const se=document.getElementById('sb_estados');se.innerHTML='';
+  ESTADOS.forEach(e=>{
+    const cnt=db.transportadoras.filter(t=>t.destinos.some(d=>d.key.startsWith(e.uf))).length;
+    const div=document.createElement('div');
+    div.className='sb-e-item';div.title=e.n;
+    div.innerHTML='<span class="sb-e-dot '+(cnt>0?'on':'')+'" ></span><span style="flex:1">'+e.uf+' <span style="color:var(--t3);font-size:10px">'+e.n+'</span></span><span class="sb-e-cnt '+(cnt>0?'has':'')+'">'+cnt+'</span>';
+    div.onclick=()=>abrirEstado(e.uf,e.n);
+    se.appendChild(div);
+  });
+}
+
+// ── DASHBOARD ──
+function renderDashboard(){
+  const nT=db.transportadoras.length;
+  const nD=db.transportadoras.reduce((a,t)=>a+t.destinos.length,0);
+  const ufs=new Set();db.transportadoras.forEach(t=>t.destinos.forEach(d=>ufs.add(d.key.split('_')[0])));
+  document.getElementById('dash_kpis').innerHTML=
+    '<div class="card card-body"><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Transportadoras</div><div style="font-size:28px;font-weight:800;color:var(--blue)">'+nT+'</div></div>'+
+    '<div class="card card-body"><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Destinos</div><div style="font-size:28px;font-weight:800;color:var(--blue)">'+nD+'</div></div>'+
+    '<div class="card card-body"><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Estados cobertos</div><div style="font-size:28px;font-weight:800;color:var(--blue)">'+ufs.size+'<span style="font-size:14px;color:var(--t3)">/27</span></div></div>'+
+    '<div class="card card-body"><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Simulações</div><div style="font-size:28px;font-weight:800;color:var(--blue)">'+db.historico.length+'</div></div>';
+
+  const peso=getPeso()||50;
+  document.getElementById('dash_peso_tag').textContent=peso.toFixed(0)+' kg';
+  const nf=parseFloat(document.getElementById('s_nf').value)||1000;
+  const p={nf,paletes:0,palcusto:85.34,tde:false,risco:false,tec:0,reentPct:0};
+
+  // Lista transportadoras
+  const tl=document.getElementById('dash_tlist');
+  if(!nT){
+    tl.innerHTML='<div style="text-align:center;padding:24px;color:var(--t3)"><p style="font-size:12px;line-height:1.8">Nenhuma transportadora cadastrada.<br><a onclick="showPage(\'importar\')" style="color:var(--blue);cursor:pointer;font-weight:600;text-decoration:underline">Importe uma tabela PDF/Excel</a><br>ou cadastre manualmente.</p></div>';
+  } else {
+    tl.innerHTML='<div style="display:flex;flex-direction:column;gap:6px">'+db.transportadoras.map((t,i)=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg);border-radius:var(--r);border:1px solid var(--bdr)"><div style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:50%;background:'+COLORS[i%COLORS.length]+';flex-shrink:0"></span><div><div style="font-weight:700;font-size:12px">'+t.nome+'</div><div style="font-size:10px;color:var(--t3)">'+t.destinos.length+' destino(s) · Vig: '+(t.vigencia||'—')+(t.versoes&&t.versoes.length?' · '+t.versoes.length+' versão(ões)':'')+'</div></div></div><div style="display:flex;gap:5px;align-items:center">'+(t.versoes&&t.versoes.length?'<button class="btn btn-outline btn-sm" onclick="abrirVersoes(\''+t.id+'\')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Versões</button>':'')+'<button class="btn btn-outline btn-sm" onclick="abrirModalT(\''+t.id+'\')">Editar</button><button class="btn btn-red btn-sm" onclick="if(confirm(\'Excluir '+t.nome+'?\')){db.transportadoras=db.transportadoras.filter(x=>x.id!==\''+t.id+'\');salvarDB();renderAll()}">✕</button></div></div>').join('')+'</div>';
+  }
+
+  // Competitividade
+  renderComp(peso,p);
+  renderCmpTable(peso,p);
+}
+
+function renderComp(peso,p){
+  const el=document.getElementById('dash_comp');
+  if(!db.transportadoras.length||!db.transportadoras.some(t=>t.destinos.length)){
+    el.innerHTML='<p style="font-size:11px;color:var(--t3);text-align:center;padding:20px">Sem dados de destinos.</p>';return;
+  }
+  const allKeys=new Set();
+  db.transportadoras.forEach(t=>t.destinos.forEach(d=>allKeys.add(d.key)));
+  const keys=[...allKeys].sort();
+  let html='<div style="display:flex;flex-direction:column;gap:8px">';
+  keys.forEach(key=>{
+    const vals=db.transportadoras.map((t,i)=>{const r=calcFrete(t,key,peso,p);return r?{nome:t.nome,val:r.total,color:COLORS[i%COLORS.length]}:null;}).filter(Boolean);
+    if(!vals.length)return;
+    vals.sort((a,b)=>a.val-b.val);
+    const minV=vals[0].val,maxV=vals[vals.length-1].val;
+    const[uf,tp]=key.split('_');const est=ESTADOS.find(e=>e.uf===uf);
+    const destNome=(est?est.n:uf)+' '+(tp==='CAP'?'(Cap)':'(Int)');
+    const eco=maxV>minV?((maxV-minV)/maxV*100).toFixed(0)+'%':'—';
+    html+='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);padding:10px 12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:700">'+destNome+'</span><div style="display:flex;align-items:center;gap:6px"><span class="badge b-green" style="font-size:9px">✓ '+vals[0].nome.split(' ')[0]+' '+fmt(minV)+'</span>'+(maxV>minV?'<span class="badge b-gray" style="font-size:9px">eco '+eco+'</span>':'')+'</div></div>';
+    vals.forEach(v=>{
+      const bw=maxV>0?Math.round(v.val/maxV*100):100;
+      html+='<div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--t2)">'+v.nome.split(' ').slice(0,2).join(' ')+'</span><span style="font-weight:700;color:'+(v.val===minV?'var(--green)':'var(--red)')+'">'+fmt(v.val)+(v.val===minV?' ✓':' +'+fmt(v.val-minV))+'</span></div><div class="cbar"><div class="cbar-fill" style="width:'+bw+'%;background:'+(v.val===minV?'var(--green)':v.color)+'"></div></div></div>';
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html+'</div>';
+}
+
+function renderCmpTable(peso,p){
+  const el=document.getElementById('dash_cmp');
+  if(!db.transportadoras.length){el.innerHTML='<p style="font-size:11px;color:var(--t3)">Cadastre transportadoras.</p>';return;}
+  const allKeys=new Set();db.transportadoras.forEach(t=>t.destinos.forEach(d=>allKeys.add(d.key)));
+  if(!allKeys.size){el.innerHTML='<p style="font-size:11px;color:var(--t3)">Adicione destinos às transportadoras.</p>';return;}
+  const keys=[...allKeys].sort();
+  let h='<div style="overflow-x:auto"><table class="cmp-tbl"><thead><tr><th class="dh">Destino</th>';
+  db.transportadoras.forEach((t,i)=>{h+='<th style="color:'+COLORS[i%COLORS.length]+'">'+t.nome.split(' ').slice(0,2).join(' ')+'</th>';});
+  h+='<th>Melhor</th><th>Economia</th></tr></thead><tbody>';
+  keys.forEach(key=>{
+    const[uf,tp]=key.split('_');const est=ESTADOS.find(e=>e.uf===uf);
+    const nome=(est?est.n:uf)+' '+(tp==='CAP'?'(Cap.)':'(Int.)');
+    const vals=db.transportadoras.map(t=>{const r=calcFrete(t,key,peso,p);return r?r.total:null;});
+    const valid=vals.filter(v=>v!==null);if(!valid.length)return;
+    const minV=Math.min(...valid),maxV=Math.max(...valid);
+    const eco=maxV>minV?((maxV-minV)/maxV*100).toFixed(1)+'%':'—';
+    h+='<tr><td class="dtd">'+nome+'</td>';
+    vals.forEach(v=>{if(v===null){h+='<td style="color:var(--t3)">—</td>';}else{const cls=v===minV?'cbest':valid.length>1&&v===maxV?'cworst':'';h+='<td class="'+cls+'">'+fmt(v)+'</td>';}});
+    h+='<td style="font-weight:700;color:var(--green);font-size:10px">'+(db.transportadoras[vals.indexOf(minV)]?.nome.split(' ')[0]||'—')+'</td><td style="font-weight:700;color:var(--green);font-size:10px">'+eco+'</td></tr>';
+  });
+  el.innerHTML=h+'</tbody></table></div>';
+}
+
+// ── TRANSPORTADORAS ──
+function renderTransportadoras(){
+  const g=document.getElementById('transp_grid');
+  if(!db.transportadoras.length){
+    g.innerHTML='<div style="text-align:center;padding:40px;grid-column:span 2;color:var(--t3)"><p style="font-size:13px">Nenhuma transportadora cadastrada.<br><a onclick="showPage(\'importar\')" style="color:var(--blue);cursor:pointer;font-weight:700;text-decoration:underline">Importe uma tabela PDF/Excel</a> ou cadastre manualmente.</p></div>';return;
+  }
+  g.innerHTML=db.transportadoras.map((t,i)=>'<div class="card"><div class="card-head"><div style="display:flex;align-items:center;gap:10px"><span style="width:12px;height:12px;border-radius:50%;background:'+COLORS[i%COLORS.length]+';flex-shrink:0"></span><div><div style="font-size:13px;font-weight:700">'+t.nome+'</div><div style="font-size:10px;color:var(--t3)">'+( t.cnpj||'—')+' · Vig: '+(t.vigencia||'—')+'</div></div></div><div style="display:flex;gap:5px">'+(t.versoes&&t.versoes.length?'<button class="btn btn-outline btn-sm" onclick="abrirVersoes(\''+t.id+'\')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'+t.versoes.length+'v</button>':'')+'<button class="btn btn-outline btn-sm" onclick="abrirModalT(\''+t.id+'\')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Editar</button><button class="btn btn-red btn-sm" onclick="if(confirm(\'Excluir?\')){ db.transportadoras=db.transportadoras.filter(x=>x.id!==\''+t.id+'\');salvarDB();renderAll()}">✕</button></div></div><div class="card-body"><div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"><span class="badge b-blue">'+t.destinos.length+' dest.</span>'+(t.versoes&&t.versoes.length?'<span class="badge b-amber">'+t.versoes.length+' versão(ões)</span>':'')+'</div><div style="font-size:10px;color:var(--t2);line-height:1.8">GRIS: '+fmtPct(t.gris)+' · GRIS RJ: '+fmtPct(t.gris_rj||0.6)+' · Ped: '+fmt(t.ped)+'/100kg · TAD: '+fmt(t.tas)+'/CT-e · Palet: '+fmt(t.palet)+'</div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px">'+t.destinos.map(d=>'<span class="badge b-gray">'+d.key+'</span>').join('')+'</div></div></div>').join('');
+}
+
+// ── VERSÕES ──
+function abrirVersoes(id){
+  const t=db.transportadoras.find(x=>x.id===id);if(!t)return;
+  document.getElementById('mv_title').textContent='Versões: '+t.nome;
+  let h='<div class="ver-card" style="background:var(--green-l);border-color:#b0e0c8"><div><div style="font-weight:700;font-size:12px">'+t.nome+' <span class="badge b-green">Versão atual</span></div><div style="font-size:10px;color:var(--t3);margin-top:2px">Salva em: '+(t.ts?new Date(t.ts).toLocaleString('pt-BR'):'—')+' · Vig: '+(t.vigencia||'—')+' · '+t.destinos.length+' destinos</div><div style="font-size:10px;color:var(--t2);margin-top:2px">GRIS: '+fmtPct(t.gris)+' · GRIS RJ: '+fmtPct(t.gris_rj||0.6)+' · Ped: '+fmt(t.ped)+' · TAD: '+fmt(t.tas)+'</div></div><button class="btn btn-outline btn-sm" onclick="abrirModalT(\''+id+'\');fecharModal(\'modal_v\')">Editar atual</button></div>';
+  if(t.versoes&&t.versoes.length){
+    const sorted=[...t.versoes].sort((a,b)=>(b.ts_v||0)-(a.ts_v||0));
+    sorted.forEach((v,vi)=>{h+='<div class="ver-card"><div><div style="font-weight:600;font-size:11px">'+v.nome+' <span class="badge b-gray">v'+(sorted.length-vi)+' anterior</span></div><div style="font-size:10px;color:var(--t3);margin-top:2px">Arquivada em: '+(v.ts_v?new Date(v.ts_v).toLocaleString('pt-BR'):'—')+' · Vig: '+(v.vigencia||'—')+' · '+(v.destinos?v.destinos.length:0)+' destinos</div><div style="font-size:10px;color:var(--t2);margin-top:2px">GRIS: '+fmtPct(v.gris)+' · Ped: '+fmt(v.ped)+' · TAD: '+fmt(v.tas)+'</div></div><button class="btn btn-outline btn-sm" onclick="restaurarVer(\''+id+'\','+vi+')">Restaurar</button></div>';});
+  } else {h+='<p style="font-size:11px;color:var(--t3);text-align:center;padding:16px">Nenhuma versão anterior.</p>';}
+  document.getElementById('mv_body').innerHTML=h;
+  document.getElementById('modal_v').classList.remove('hidden');
+}
+function restaurarVer(tid,vi){
+  if(!confirm('Restaurar esta versão como atual?'))return;
+  const idx=db.transportadoras.findIndex(x=>x.id===tid);if(idx<0)return;
+  const t=db.transportadoras[idx];
+  const sorted=[...t.versoes].sort((a,b)=>(b.ts_v||0)-(a.ts_v||0));
+  const vr=sorted[vi];
+  if(!t.versoes)t.versoes=[];
+  t.versoes.push({...t,versoes:undefined,ts_v:Date.now()});
+  const novaBase={...vr,id:tid,ts:Date.now(),versoes:t.versoes,ts_v:undefined};
+  db.transportadoras[idx]=novaBase;
+  salvarDB();renderAll();fecharModal('modal_v');alert('Versão restaurada!');
+}
+
+// ── SIMULADOR ──
+function populateUFs(){
+  const sel=document.getElementById('s_uf');sel.innerHTML='';
+  const keys=new Set();db.transportadoras.forEach(t=>t.destinos.forEach(d=>keys.add(d.key)));
+  if(!keys.size){ESTADOS.forEach(e=>{['CAP','INT'].forEach(tp=>{const o=document.createElement('option');o.value=e.uf+'_'+tp;o.textContent=e.uf+' '+(tp==='CAP'?'Capital':'Interior');sel.appendChild(o);});});return;}
+  [...keys].sort().forEach(k=>{const[uf,tp]=k.split('_');const e=ESTADOS.find(x=>x.uf===uf);const o=document.createElement('option');o.value=k;o.textContent=(e?e.n:uf)+' ('+(tp==='CAP'?'Capital':'Interior')+')';sel.appendChild(o);});
+}
+function renderSimChecks(){
+  const el=document.getElementById('s_checks');el.innerHTML='';
+  db.transportadoras.forEach((t,i)=>{
+    const lbl=document.createElement('label');
+    lbl.style.cssText='display:flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--bdr);border-radius:var(--r);cursor:pointer;font-size:12px;font-weight:600;background:var(--bg2);transition:all .12s;user-select:none';
+    lbl.innerHTML='<input type="checkbox" value="'+t.id+'" checked style="accent-color:'+COLORS[i%COLORS.length]+';width:14px;height:14px"> <span style="width:8px;height:8px;border-radius:50%;background:'+COLORS[i%COLORS.length]+';display:inline-block;flex-shrink:0"></span> '+t.nome;
+    el.appendChild(lbl);
+  });
+  if(!db.transportadoras.length)el.innerHTML='<p style="font-size:11px;color:var(--t3)">Nenhuma transportadora cadastrada.</p>';
+}
+
+function simular(){
+  const destKey=document.getElementById('s_uf').value;
+  if(!destKey){alert('Selecione um destino.');return;}
+  const peso=getPeso();
+  const p={
+    nf:parseFloat(document.getElementById('s_nf').value)||0,
+    paletes:parseInt(document.getElementById('s_pal').value)||0,
+    palcusto:85.34,
+    tde:document.getElementById('s_tde').value==='1',
+    risco:false,
+    tec:parseFloat(document.getElementById('s_tec').value)||0,
+    reentPct:parseInt(document.getElementById('s_reent').value)||0
+  };
+  const limite=parseInt(document.getElementById('s_lim_r').value)||500;
+  const ids=Array.from(document.querySelectorAll('#s_checks input:checked')).map(c=>c.value);
+  if(!ids.length){alert('Selecione ao menos uma transportadora.');return;}
+
+  const results=[];
+  ids.forEach(id=>{
+    const t=db.transportadoras.find(x=>x.id===id);
+    if(t){const r=calcFrete(t,destKey,peso,p);if(r)results.push({t,r,ci:db.transportadoras.indexOf(t)});}
+  });
+  if(!results.length){
+    const el=document.getElementById('sim_res');
+    el.innerHTML='<div class="alert a-warn"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Nenhuma transportadora selecionada possui este destino cadastrado.</span></div>';
+    el.classList.remove('hidden');return;
+  }
+  results.sort((a,b)=>a.r.total-b.r.total);
+  const[uf,tp]=destKey.split('_');const est=ESTADOS.find(e=>e.uf===uf);
+  const destNome=(est?est.n:uf)+' ('+(tp==='CAP'?'Capital':'Interior')+')';
+  const minV=results[0].r.total,maxV=results[results.length-1].r.total;
+  const eco=maxV>minV?((maxV-minV)/maxV*100).toFixed(1):'0.0';
+
+  db.historico.push({id:uid(),ts:Date.now(),uf:destKey,peso:peso.toFixed(2),nf:p.nf,vencedora:results[0].t.nome,transportadoras:results.length,resultados:results.map(r=>({nome:r.t.nome,total:r.r.total}))});
+  salvarDB();
+
+  let h='<div class="res-banner rb-green"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg><span>Melhor preço: <strong>'+results[0].t.nome+'</strong> · '+destNome+' · '+peso.toFixed(1)+'kg · NF '+fmt(p.nf)+' · Economia: <strong>'+eco+'%</strong></span></div>';
+
+  const acima=results.filter(r=>r.r.total>limite);
+  if(acima.length)h+='<div class="alert a-warn" style="margin-bottom:14px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Acima do limite '+fmt(limite)+': '+acima.map(r=>r.t.nome).join(', ')+'</span></div>';
+
+  // KPI cards
+  h+='<div class="mc-grid" style="grid-template-columns:repeat('+Math.min(results.length,4)+',1fr);margin-bottom:16px">';
+  results.forEach((res,idx)=>{
+    const isW=res.r.total===minV;
+    const diff=idx>0?res.r.total-minV:null;
+    const pctDiff=diff&&minV>0?((diff/minV)*100).toFixed(1):null;
+    h+='<div class="mc '+(isW?'winner':'')+'"><div class="mc-label"><span style="width:8px;height:8px;border-radius:50%;background:'+COLORS[res.ci%COLORS.length]+';display:inline-block"></span>'+res.t.nome+'</div><div class="mc-value">'+fmt(res.r.total)+'</div><div class="mc-diff '+(isW?'cheaper':'pricier')+'"> '+(isW?'✓ Melhor preço':'+'+fmt(diff)+' (+'+pctDiff+'%)')+'</div><div style="font-size:9px;color:var(--t3);margin-top:4px">GRIS '+fmtPct(res.r.grisRate)+' · Ped '+fmt(res.r.ped)+'</div></div>';
+  });
+  h+='</div>';
+
+  // Barras
+  h+='<div class="card gap-b"><div class="card-body"><div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:10px">Comparativo visual</div>';
+  results.forEach(res=>{
+    const bw=maxV>0?Math.round(res.r.total/maxV*100):100;
+    const isW=res.r.total===minV;
+    h+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-bottom:3px"><span style="color:'+COLORS[res.ci%COLORS.length]+'">'+res.t.nome+'</span><span style="color:'+(isW?'var(--green)':'var(--red)')+'">'+fmt(res.r.total)+' '+(isW?'✓':'(+'+(((res.r.total-minV)/minV)*100).toFixed(1)+'%)')+'</span></div><div class="cbar" style="height:8px"><div class="cbar-fill" style="width:'+bw+'%;background:'+(isW?'var(--green)':COLORS[res.ci%COLORS.length])+'"></div></div></div>';
+  });
+  h+='</div></div>';
+
+  // Tabs
+  h+='<div class="card"><div class="tabs"><button class="tab-btn active" onclick="stab(\'sbd\')">Detalhamento</button><button class="tab-btn" onclick="stab(\'sch\')">Gráfico por peso</button><button class="tab-btn" onclick="stab(\'srs\')">Resumo texto</button></div>';
+
+  h+='<div id="sbd" class="tab-pane active" style="padding:14px 16px"><div style="display:grid;grid-template-columns:repeat('+Math.min(results.length,3)+',1fr);gap:12px">';
+  results.forEach((res,idx)=>{
+    const r=res.r;
+    const rows=[['Frete base',r.fbase],['Ad Valorem',r.av],['GRIS ('+fmtPct(r.grisRate)+')',r.gris],['Pedágio',r.ped],['TAD/TAS',r.tas]];
+    if(r.emb>0)rows.push(['Taxa embarque',r.emb]);
+    if(r.tdeV>0)rows.push(['TDE/Agend.',r.tdeV]);
+    if(r.palV>0)rows.push(['Paletização',r.palV]);
+    if(r.riscoV>0)rows.push(['Risco SP',r.riscoV]);
+    if(r.reentV>0)rows.push(['Reentrega',r.reentV]);
+    if(r.tecV>0)rows.push(['TEC',r.tecV]);
+    h+='<div><div style="font-size:11px;font-weight:700;color:'+COLORS[res.ci%COLORS.length]+';border-bottom:2px solid '+COLORS[res.ci%COLORS.length]+';padding-bottom:5px;margin-bottom:8px">'+res.t.nome+'</div>';
+    h+=rows.map(([k,v])=>'<div class="bd-row"><span class="bd-k">'+k+'</span><span class="bd-v">'+fmt(v)+'</span></div>').join('');
+    h+='<div class="bd-row bd-total"><span class="bd-k">TOTAL</span><span class="bd-v">'+fmt(r.total)+'</span></div></div>';
+  });
+  h+='</div></div>';
+
+  h+='<div id="sch" class="tab-pane" style="padding:14px 16px"><div class="chart-wrap"><canvas id="sim_chart" role="img" aria-label="Comparativo por faixa de peso">Gráfico comparativo</canvas></div><div class="chart-leg" id="sim_leg"></div></div>';
+
+  let resumo='SIMULADOR DE FRETE — GRUPO MOAS\n'+'─'.repeat(50)+'\nData: '+new Date().toLocaleString('pt-BR')+'\nOrigem: São Paulo — SP\nDestino: '+destNome+'\nPeso: '+peso.toFixed(2)+'kg | NF: '+fmt(p.nf)+' | Limite: '+fmt(limite)+'\n\n';
+  results.forEach((res,i)=>{resumo+=(i===0?'★':' ')+' '+res.t.nome.padEnd(30)+' '+fmt(res.r.total)+(res.r.total>limite?' ⚠ ACIMA':i===0?' ✓ MELHOR':' (+'+fmt(res.r.total-minV)+')')+'\n';});
+  resumo+='\nECONOMIA: '+eco+'% ('+fmt(maxV-minV)+' entre melhor e pior)';
+
+  h+='<div id="srs" class="tab-pane" style="padding:14px 16px"><button class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="navigator.clipboard.writeText(document.getElementById(\'rp\').textContent).catch(()=>{})">📋 Copiar resumo</button><pre id="rp" style="font-size:10px;background:var(--bg);padding:12px;border-radius:var(--r);border:1px solid var(--bdr);white-space:pre-wrap;color:var(--text)">'+resumo+'</pre></div>';
+  h+='</div>';
+
+  const el=document.getElementById('sim_res');el.innerHTML=h;el.classList.remove('hidden');
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(()=>buildChart(results,destKey,peso,p,limite),120);
+}
+
+function stab(id){
+  document.querySelectorAll('#sim_res .tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#sim_res .tab-btn').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById(id);if(el)el.classList.add('active');
+  document.querySelectorAll('#sim_res .tab-btn').forEach(b=>{if(b.getAttribute('onclick').includes("'"+id+"'"))b.classList.add('active');});
+}
+
+function buildChart(results,destKey,peso,p,limite){
+  const canvas=document.getElementById('sim_chart');if(!canvas)return;
+  if(chartInst)chartInst.destroy();
+  const pesos=[5,10,20,30,50,70,100,150,200,300,500];
+  const datasets=results.map((res)=>({
+    label:res.t.nome,
+    data:pesos.map(pw=>{const r=calcFrete(res.t,destKey,pw,p);return r?parseFloat(r.total.toFixed(2)):null;}),
+    borderColor:COLORS[res.ci%COLORS.length],backgroundColor:'transparent',tension:.3,pointRadius:3,borderWidth:2
+  }));
+  datasets.push({label:'Limite',data:pesos.map(()=>limite),borderColor:'var(--amber)',backgroundColor:'transparent',borderWidth:1.5,borderDash:[5,5],pointRadius:0});
+  chartInst=new Chart(canvas,{type:'line',data:{labels:pesos.map(p=>p+'kg'),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)}}},scales:{y:{ticks:{callback:v=>'R$'+v.toLocaleString('pt-BR'),font:{size:9}},grid:{color:'rgba(0,0,0,.04)'}},x:{ticks:{font:{size:9}},grid:{display:false}}}}});
+  const leg=document.getElementById('sim_leg');
+  if(leg)leg.innerHTML=datasets.map(d=>'<span class="leg-i"><span class="leg-d" style="background:'+d.borderColor+'"></span>'+d.label+'</span>').join('');
+}
+
+// ── ESTADO MODAL ──
+function abrirEstado(uf,nome){
+  const p={nf:parseFloat(document.getElementById('s_nf').value)||1000,paletes:0,palcusto:85.34,tde:false,risco:false,tec:0,reentPct:0};
+  const peso=getPeso()||50;
+  document.getElementById('me_title').textContent=nome+' ('+uf+') · '+peso.toFixed(1)+'kg · NF '+fmt(p.nf);
+  const transp=db.transportadoras.filter(t=>t.destinos.some(d=>d.key.startsWith(uf)));
+  let h='';
+  ['CAP','INT'].forEach(tipo=>{
+    const key=uf+'_'+tipo;
+    const rlist=[];
+    transp.forEach(t=>{const r=calcFrete(t,key,peso,p);if(r)rlist.push({t,r,ci:db.transportadoras.indexOf(t)});});
+    if(!rlist.length)return;
+    rlist.sort((a,b)=>a.r.total-b.r.total);
+    const min=rlist[0].r.total,max=rlist[rlist.length-1].r.total;
+    const eco=max>min?((max-min)/max*100).toFixed(1):'0';
+    h+='<div style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;padding-bottom:6px;border-bottom:2px solid var(--bdr);margin-bottom:10px;display:flex;justify-content:space-between"><span>'+nome+' — '+(tipo==='CAP'?'Capital':'Interior')+'</span><span class="badge b-green">Economia: '+eco+'%</span></div>';
+    rlist.forEach(({t,r,ci})=>{
+      const diff=r.total-min;const isW=diff<0.01;
+      const bw=max>0?Math.round(r.total/max*100):100;
+      h+='<div style="padding:10px 12px;border-radius:var(--r);border:1.5px solid '+(isW?'var(--green)':'var(--bdr)')+';background:'+(isW?'var(--green-l)':'var(--bg2)')+';margin-bottom:6px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:700;font-size:12px;color:'+COLORS[ci%COLORS.length]+'">'+t.nome+'</span><span style="font-weight:800;font-size:13px;color:'+(isW?'var(--green)':'var(--red)')+'">'+fmt(r.total)+' '+(isW?'✓':'(+'+fmt(diff)+' / '+(diff/min*100).toFixed(1)+'%)')+'</span></div><div style="font-size:10px;color:var(--t2)">Base: '+fmt(r.fbase)+' · GRIS '+fmtPct(r.grisRate)+': '+fmt(r.gris)+' · Ped: '+fmt(r.ped)+' · TAD: '+fmt(r.tas)+'</div><div class="cbar" style="margin-top:6px"><div class="cbar-fill" style="width:'+bw+'%;background:'+(isW?'var(--green)':COLORS[ci%COLORS.length])+'"></div></div></div>';
+    });
+    h+='</div>';
+  });
+  document.getElementById('me_body').innerHTML=h||'<p style="color:var(--t3);text-align:center;padding:20px">Sem dados para este estado.</p>';
+  document.getElementById('modal_e').classList.remove('hidden');
+}
+
+// ── HISTÓRICO ──
+function renderHist(){
+  const fd=document.getElementById('hf_d').value;
+  const ft=document.getElementById('hf_t').value;
+  let lista=db.historico;
+  if(fd)lista=lista.filter(h=>h.uf===fd);
+  if(ft)lista=lista.filter(h=>h.vencedora===ft||(h.resultados&&h.resultados.some(r=>r.nome===ft)));
+  const el=document.getElementById('hist_lista');
+  if(!lista.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)"><p style="font-size:13px">Nenhuma simulação registrada.</p></div>';return;}
+  const grouped={};lista.forEach(h=>{if(!grouped[h.uf])grouped[h.uf]=[];grouped[h.uf].push(h);});
+  let h='';
+  Object.entries(grouped).sort().forEach(([uf,items])=>{
+    const[u,t]=uf.split('_');const e=ESTADOS.find(x=>x.uf===u);
+    const n=(e?e.n:u)+' ('+(t==='CAP'?'Capital':'Interior')+')';
+    h+='<div class="gap-b"><div style="font-size:12px;font-weight:700;padding:8px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:8px;border:1px solid var(--bdr);display:flex;justify-content:space-between"><span>'+n+'</span><span class="badge b-blue">'+items.length+' simulação(ões)</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Data/Hora</th><th>Peso</th><th>NF</th><th>Melhor</th><th>Valor</th><th>Transp.</th><th></th></tr></thead><tbody>';
+    [...items].reverse().forEach(i=>{
+      const tot=i.resultados?i.resultados.find(r=>r.nome===i.vencedora):null;
+      h+='<tr><td>'+new Date(i.ts).toLocaleString('pt-BR')+'</td><td class="num">'+i.peso+'kg</td><td class="num">'+fmt(i.nf)+'</td><td style="font-weight:700;color:var(--green)">'+(i.vencedora||'—')+'</td><td class="num">'+(tot?fmt(tot.total):'—')+'</td><td class="num">'+i.transportadoras+'</td><td><button onclick="db.historico=db.historico.filter(x=>x.id!==\''+i.id+'\');salvarDB();renderHist()" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;padding:2px 6px;border-radius:3px">✕</button></td></tr>';
+    });
+    h+='</tbody></table></div></div>';
+  });
+  el.innerHTML=h;
+  // Filtros
+  const sd=document.getElementById('hf_d'),st=document.getElementById('hf_t');
+  const cd=sd.value,ct=st.value;
+  sd.innerHTML='<option value="">Todos destinos</option>';
+  const ufs=new Set(db.historico.map(h=>h.uf));[...ufs].sort().forEach(uf=>{const[u,t]=uf.split('_');const e=ESTADOS.find(x=>x.uf===u);const o=document.createElement('option');o.value=uf;o.textContent=(e?e.n:u)+' ('+(t==='CAP'?'Capital':'Interior')+')';sd.appendChild(o);});
+  st.innerHTML='<option value="">Todas</option>';
+  const ts=new Set(db.historico.map(h=>h.vencedora).filter(Boolean));[...ts].sort().forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;st.appendChild(o);});
+  sd.value=cd;st.value=ct;
+}
+
+// ── SEED + INIT ──
+function renderAll(){
+  renderSidebar();
+  renderTransportadoras();
+  renderDashboard();
+}
+
+function seed(){
+  if(db.transportadoras.length)return;
+  // ALFA TRANSPORTES
+  db.transportadoras.push({id:uid(),nome:'Alfa Transportes LTDA',cnpj:'',vigencia:'2025-03-10',seguradora:'',obs:'Vigência 10/03/2025. Reajuste INTC automático. Fat. quinzenal 20 dias. Cubagem 200kg/m³. GRIS RJ 0,60%.',
+    av:0,gris:0.15,gris_rj:0.60,ped:4.78,tas:4.29,tde:250,palet:85.34,tec:0,cub:200,reent:50,dev:100,fat:20,val_p:60,tda:85.34,risco:0,trt:0,ts:Date.now(),
+    destinos:[
+      {key:'RJ_CAP',label:'RJ Capital (Rio de Janeiro)',faixas:[{ate:10,valor:35.87},{ate:30,valor:46.35},{ate:50,valor:54.75},{ate:70,valor:62.36},{ate:100,valor:67.10},{ate:150,valor:84.45},{ate:200,valor:113.09}],excedente:0.5654,taxa_emb:0},
+      {key:'RJ_INT',label:'RJ Interior',faixas:[{ate:10,valor:68.05},{ate:30,valor:82.35},{ate:50,valor:96.58},{ate:70,valor:110.88},{ate:100,valor:132.30},{ate:150,valor:143.44},{ate:200,valor:191.26}],excedente:0.9563,taxa_emb:0},
+      {key:'SC_CAP',label:'SC Capital (Blumenau/Floripa/Joinville)',faixas:[{ate:10,valor:49.67},{ate:30,valor:51.60},{ate:50,valor:62.91},{ate:70,valor:71.49},{ate:100,valor:76.07},{ate:150,valor:94.31},{ate:200,valor:103.33}],excedente:0.6071,taxa_emb:0},
+      {key:'SC_INT',label:'SC Interior',faixas:[{ate:10,valor:68.17},{ate:30,valor:71.57},{ate:50,valor:98.59},{ate:70,valor:113.60},{ate:100,valor:129.64},{ate:150,valor:149.46},{ate:200,valor:164.23}],excedente:0.9234,taxa_emb:0},
+      {key:'PR_CAP',label:'PR Capital (Curitiba)',faixas:[{ate:10,valor:47.03},{ate:30,valor:47.90},{ate:50,valor:57.35},{ate:70,valor:67.48},{ate:100,valor:76.98},{ate:150,valor:86.18},{ate:200,valor:93.09}],excedente:0.5312,taxa_emb:0},
+      {key:'PR_INT',label:'PR Interior',faixas:[{ate:10,valor:67.26},{ate:30,valor:70.06},{ate:50,valor:97.16},{ate:70,valor:115.00},{ate:100,valor:124.14},{ate:150,valor:149.00},{ate:200,valor:158.50}],excedente:0.8728,taxa_emb:0},
+      {key:'RS_CAP',label:'RS Capital (Porto Alegre)',faixas:[{ate:10,valor:50.96},{ate:30,valor:53.52},{ate:50,valor:64.49},{ate:70,valor:78.10},{ate:100,valor:91.54},{ate:150,valor:115.98},{ate:200,valor:138.84}],excedente:0.6451,taxa_emb:0},
+      {key:'RS_INT',label:'RS Interior',faixas:[{ate:10,valor:73.09},{ate:30,valor:76.76},{ate:50,valor:116.01},{ate:70,valor:131.11},{ate:100,valor:152.05},{ate:150,valor:199.57},{ate:200,valor:255.28}],excedente:1.1510,taxa_emb:0},
+      {key:'SP_CAP',label:'SP Capital (São Paulo)',faixas:[{ate:10,valor:57.59},{ate:30,valor:57.59},{ate:50,valor:57.59},{ate:70,valor:78.26},{ate:100,valor:78.26},{ate:150,valor:79.69},{ate:200,valor:106.25}],excedente:0.5312,taxa_emb:0},
+      {key:'SP_INT',label:'SP Interior',faixas:[{ate:10,valor:59.60},{ate:30,valor:59.60},{ate:50,valor:59.60},{ate:70,valor:102.40},{ate:100,valor:102.40},{ate:150,valor:102.40},{ate:200,valor:112.07}],excedente:0.5604,taxa_emb:0},
+      {key:'MS_CAP',label:'MS (Três Lagoas/N.Andradina)',faixas:[{ate:10,valor:161.54},{ate:30,valor:193.51},{ate:50,valor:225.34},{ate:70,valor:257.17},{ate:100,valor:305.12},{ate:150,valor:384.85}],excedente:1.8137,taxa_emb:145.54},
+      {key:'MS_INT',label:'MS (Campo Grande/Dourados)',faixas:[{ate:10,valor:262.79},{ate:30,valor:319.15},{ate:50,valor:375.51},{ate:70,valor:431.86},{ate:100,valor:516.33},{ate:150,valor:657.11}],excedente:2.9442,taxa_emb:234.60},
+      {key:'MG_CAP',label:'MG (BH/Uberlândia/Uberaba e cidades)',faixas:[{ate:50,valor:39.67},{ate:100,valor:65.68}],excedente:0.4847,taxa_emb:0},
+      {key:'MG_INT',label:'MG Interior',faixas:[{ate:50,valor:63.46},{ate:100,valor:85.90}],excedente:0.7505,taxa_emb:0},
+      {key:'GO_CAP',label:'GO (Goiânia/Caldas Novas/Rio Verde)',faixas:[{ate:50,valor:39.79},{ate:100,valor:77.53}],excedente:0.5003,taxa_emb:0},
+      {key:'GO_INT',label:'GO Interior',faixas:[{ate:50,valor:63.70},{ate:100,valor:124.08}],excedente:0.8129,taxa_emb:0},
+      {key:'ES_CAP',label:'ES (Vitória/Cachoeiro)',faixas:[{ate:50,valor:46.04},{ate:100,valor:80.85}],excedente:0.5784,taxa_emb:0},
+      {key:'ES_INT',label:'ES Interior',faixas:[{ate:50,valor:73.67},{ate:100,valor:109.47}],excedente:0.8912,taxa_emb:0},
+      {key:'DF_CAP',label:'DF (Brasília)',faixas:[{ate:50,valor:40.51},{ate:100,valor:78.91}],excedente:0.5003,taxa_emb:0},
+    ]});
+  // MMA CARGAS (MOAS)
+  db.transportadoras.push({id:uid(),nome:'MMA Cargas Expressas (MOAS)',cnpj:'05.388.725/0003-84',vigencia:'2026-05-20',seguradora:'Tokyo Marine',obs:'TEC 6% temporária. Não transporta líquidos/químicos. Reajuste diesel >10%.',
+    av:0,gris:0.15,gris_rj:0.15,ped:7.24,tas:6.60,tde:250,palet:105.76,tec:6,cub:250,reent:50,dev:100,fat:18,val_p:15,tda:250,risco:42.54,trt:20,ts:Date.now(),
+    destinos:[
+      {key:'SP_CAP',label:'SP Capital',faixas:[{ate:10,valor:55.00},{ate:30,valor:61.11},{ate:50,valor:64.93},{ate:70,valor:68.74},{ate:100,valor:76.48},{ate:150,valor:80.00},{ate:200,valor:84.00}],excedente:0.76,taxa_emb:0},
+      {key:'RJ_CAP',label:'RJ Capital',faixas:[{ate:10,valor:64.00},{ate:30,valor:71.29},{ate:50,valor:75.75},{ate:70,valor:80.20},{ate:100,valor:89.23},{ate:150,valor:94.00},{ate:200,valor:98.00}],excedente:0.89,taxa_emb:0},
+      {key:'RJ_INT',label:'RJ Interior',faixas:[{ate:10,valor:95.00},{ate:30,valor:105.39},{ate:50,valor:111.99},{ate:70,valor:118.59},{ate:100,valor:132.56},{ate:150,valor:140.00},{ate:200,valor:146.00}],excedente:1.33,taxa_emb:0},
+      {key:'ES_CAP',label:'ES Capital',faixas:[{ate:10,valor:83.00},{ate:30,valor:91.65},{ate:50,valor:97.39},{ate:70,valor:103.12},{ate:100,valor:114.72},{ate:150,valor:120.00},{ate:200,valor:126.00}],excedente:1.15,taxa_emb:0},
+      {key:'ES_INT',label:'ES Interior',faixas:[{ate:10,valor:106.00},{ate:30,valor:117.40},{ate:50,valor:124.75},{ate:70,valor:132.10},{ate:100,valor:146.59},{ate:150,valor:154.00},{ate:200,valor:161.00}],excedente:1.47,taxa_emb:0},
+    ]});
+  salvarDB();
+}
+
+
+// ── VERIFICAÇÃO DE PROTOCOLO ──
+function checkProtocol(){
+  const isFile=location.protocol==='file:';
+  const el=document.getElementById('protocol_warn');
+  if(!el)return;
+  if(isFile){
+    el.style.display='';
+    el.innerHTML='<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff8e8;border:1px solid #f0d080;border-radius:var(--rl);margin-bottom:14px;font-size:11px;color:#7a5800"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div><strong>Arquivo aberto direto do computador (file://).</strong> O browser bloqueia chamadas de API neste modo.<br><br><strong>Para a IA funcionar, abra via servidor local:</strong><ol style="margin:6px 0 0 14px;line-height:2.2"><li>Abra o <strong>Terminal</strong> (Windows: tecla Windows → digite <em>cmd</em> → Enter)</li><li>Navegue até a pasta: <code style="background:#fff3cc;padding:1px 5px;border-radius:3px">cd "caminho\\da\\pasta"</code></li><li>Execute: <code style="background:#fff3cc;padding:1px 5px;border-radius:3px">python -m http.server 8080</code></li><li>No Chrome abra: <a href="http://localhost:8080" target="_blank" style="color:#7a5800;font-weight:700">http://localhost:8080</a> e clique no arquivo</li></ol><div style="margin-top:8px;padding:8px 10px;background:#fff3cc;border-radius:5px">💡 <strong>Windows sem Python?</strong> Baixe em <a href="https://www.python.org/downloads/" target="_blank" style="color:#7a5800;font-weight:700">python.org/downloads</a> — instalação em 2 min, grátis.</div></div></div>';
+  } else {
+    el.style.display='none';
+  }
+}
+
+// ── GESTÃO DE API KEY E PROVEDOR ──
+function atualizarStatusApiKey(){
+  const prov=getProvider();
+  ['gemini','claude'].forEach(p=>{
+    const el=document.getElementById(p+'_key_status');const k=getApiKeyFor(p);
+    if(el)el.innerHTML=k?'<span style="color:var(--green);font-weight:600">\u2713 Configurada</span>':'<span style="color:var(--t3)">N\u00e3o configurada</span>';
+  });
+  const inp=document.getElementById('inline_key_input');
+  if(inp){const k=getApiKeyFor(prov);inp.value='';inp.placeholder=k?'J\u00e1 configurada \u2014 cole para alterar...':prov==='gemini'?'AIzaSy...':'sk-ant-...';}
+  const msg=document.getElementById('inline_key_msg');if(msg)msg.textContent='';
+  const btn=document.getElementById('cfg_btn');
+  if(btn){const k=getApiKey();btn.style.borderColor=k?'var(--green)':'';btn.title=k?(prov==='gemini'?'Gemini \u2713':'Claude \u2713'):'Configurar API Key';}
+  const gg=document.getElementById('guide_gemini');const gc=document.getElementById('guide_claude');
+  if(gg)gg.style.display=prov==='gemini'?'':'none';if(gc)gc.style.display=prov==='claude'?'':'none';
+  ['gemini','claude'].forEach(p=>{const c=document.getElementById('card_'+p);if(!c)return;const a=p===prov;c.style.borderColor=a?'var(--sage)':'var(--bdr)';c.style.background=a?'var(--sage-l)':'var(--bg2)';});
+}
+function trocarProvider(prov){saveProvider(prov);atualizarStatusApiKey();}
+function salvarKeyInline(){
+  const inp=document.getElementById('inline_key_input');const msg=document.getElementById('inline_key_msg');
+  const val=inp?inp.value.trim():'';if(!val){if(msg){msg.textContent='Cole a chave antes de salvar.';msg.style.color='var(--red)';}return;}
+  const prov=getProvider();const prefix=prov==='gemini'?'AIza':'sk-ant-';
+  if(!val.startsWith(prefix)){if(!confirm('A chave n\u00e3o parece ser do '+(prov==='gemini'?'Gemini':'Claude')+'. Salvar mesmo assim?'))return;}
+  localStorage.setItem('gmoas_apikey_'+prov,val);if(inp)inp.value='';
+  if(msg){msg.textContent='\u2713 Chave salva! Pode importar agora.';msg.style.color='var(--green)';}
+  atualizarStatusApiKey();setTimeout(()=>{if(msg)msg.textContent='';},4000);
+}
+function abrirConfigs(){
+  const prov=getProvider();const k=getApiKey();
+  const title=document.getElementById('modal_cfg_title');
+  if(title)title.textContent='\u2699 '+(prov==='gemini'?'Chave Google Gemini (gratuito)':'Chave Claude Anthropic');
+  const inp=document.getElementById('cfg_apikey');if(inp){inp.value='';inp.placeholder=prov==='gemini'?'AIzaSy...':'sk-ant-...';}
+  const st=document.getElementById('cfg_status');if(st){st.textContent=k?'\u2713 Chave configurada':'Nenhuma chave salva.';st.style.color=k?'var(--green)':'var(--t3)';}
+  document.getElementById('modal_cfg').classList.remove('hidden');
+}
+function salvarApiKeyModal(){
+  const inp=document.getElementById('cfg_apikey');const val=inp?inp.value.trim():'';if(!val){alert('Informe a chave.');return;}
+  const prov=getProvider();const prefix=prov==='gemini'?'AIza':'sk-ant-';
+  if(!val.startsWith(prefix)){if(!confirm('A chave n\u00e3o parece ser do '+(prov==='gemini'?'Gemini':'Claude')+'. Salvar mesmo assim?'))return;}
+  localStorage.setItem('gmoas_apikey_'+prov,val);
+  const st=document.getElementById('cfg_status');if(st){st.textContent='\u2713 Salva!';st.style.color='var(--green)';}
+  setTimeout(()=>{fecharModal('modal_cfg');atualizarStatusApiKey();},700);
+}
+function limparApiKey(){
+  const prov=getProvider();if(!confirm('Remover a chave do '+(prov==='gemini'?'Gemini':'Claude')+'?'))return;
+  localStorage.removeItem('gmoas_apikey_'+prov);atualizarStatusApiKey();
+  const inp=document.getElementById('cfg_apikey');if(inp)inp.value='';
+  const st=document.getElementById('cfg_status');if(st){st.textContent='Chave removida.';st.style.color='var(--red)';}
+}
+function salvarApiKey(){
+  const inp=document.getElementById('apikey_input');const val=inp?inp.value.trim():'';if(!val)return;
+  localStorage.setItem('gmoas_apikey_'+getProvider(),val);atualizarStatusApiKey();
+  const fu=document.getElementById('file_up');
+  if(fu&&fu.files&&fu.files[0]){document.getElementById('ai_prog').classList.add('hidden');document.getElementById('imp_prev').classList.add('hidden');handleFile(fu.files[0]);}
+}
+
+carregarDB();seed();renderAll();showPage('dashboard');setTimeout(checkProtocol,100);
+</script>
+
+<!-- MODAL API KEY -->
+<div class="modal-bg hidden" id="modal_cfg">
+<div class="modal" style="max-width:480px">
+  <div class="modal-head"><span class="modal-title" id="modal_cfg_title">&#9881; Configurar API Key</span><button class="modal-close" onclick="fecharModal('modal_cfg')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+  <div class="modal-body">
+    <div class="alert a-info" style="margin-bottom:12px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Chave salva apenas no seu navegador. Use a tela de Importar para trocar entre Gemini e Claude.</span></div>
+    <div class="field" style="margin-bottom:10px"><label>Chave API</label><input type="password" id="cfg_apikey" placeholder="AIzaSy... ou sk-ant-..." style="font-family:monospace;font-size:12px"></div>
+    <div id="cfg_status" style="font-size:11px;min-height:16px"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-red btn-sm" onclick="limparApiKey()">Remover chave</button><button class="btn btn-outline" onclick="fecharModal('modal_cfg')">Cancelar</button><button class="btn btn-primary" onclick="salvarApiKeyModal()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2l11 0 5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Salvar</button></div>
+</div></div>
+</body>
+</html>
